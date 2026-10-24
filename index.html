@@ -1,0 +1,575 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>角色對話標記工作坊</title>
+<style>
+:root{
+  --bg:#f6f5f1; --panel:#ffffff; --ink:#1f2328; --muted:#5f6670; --line:#e2dfd6;
+  --accent:#1f5f8b; --accent-soft:#e6eff6; --warn:#a4501b; --ok:#2e7d4f;
+  --star:#c58a00; --lock:#7a3e9d;
+  --c1:#2f6fb0; --c2:#c06b12; --c3:#2e8b57; --c4:#7b4fb3; --c5:#c0392b;
+  --c6:#13867f; --c7:#5d6d7e; --c8:#9a8f7a; --c9:#b0306f;
+  --sp-maple:#b5532a; --sp-lotus:#2c6fa8; --sp-fruit:#3d8a3a; --sp-vine:#8a4fa3;
+  --radius:10px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:"Microsoft JhengHei","PingFang TC","Noto Sans TC","Heiti TC",system-ui,sans-serif;
+  font-size:16px;line-height:1.6}
+button{font:inherit;cursor:pointer}
+input,textarea{font:inherit}
+.hidden{display:none!important}
+header.top{position:sticky;top:0;z-index:20;background:var(--panel);border-bottom:1px solid var(--line);
+  display:flex;align-items:center;gap:16px;padding:10px 20px;flex-wrap:wrap}
+header.top h1{font-size:18px;margin:0;font-weight:700;letter-spacing:.02em}
+header.top .who{color:var(--muted);font-size:14px}
+header.top .spacer{flex:1}
+.progress{font-size:14px;color:var(--muted)}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tab{border:1px solid var(--line);background:#fff;border-radius:999px;padding:4px 14px;font-size:14px;color:var(--ink)}
+.tab.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.tab .done{font-size:12px;opacity:.8;margin-left:4px}
+main{max-width:1280px;margin:0 auto;padding:20px}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:20px;align-items:start}
+@media (max-width:980px){.layout{grid-template-columns:1fr}.legend{position:static!important;max-height:none!important}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px}
+.intro h2{margin:0 0 8px;font-size:22px}
+.intro p{margin:6px 0}
+.intro ol{margin:6px 0 6px 1.2em;padding:0}
+.field{display:flex;gap:10px;align-items:center;margin:16px 0;flex-wrap:wrap}
+.field input{padding:8px 12px;border:1px solid var(--line);border-radius:8px;min-width:220px}
+.btn{border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;padding:8px 16px}
+.btn.ghost{background:#fff;color:var(--accent)}
+.btn.small{padding:4px 10px;font-size:14px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.excerpt-head h2{margin:0;font-size:20px}
+.excerpt-head .src{color:var(--muted);font-size:14px;margin-top:2px}
+.context{background:var(--accent-soft);border-radius:8px;padding:10px 14px;margin:12px 0 4px;font-size:15px}
+.hint{color:var(--muted);font-size:13px}
+.lines{display:flex;flex-direction:column;gap:10px;margin-top:14px}
+.ln{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;outline:none;transition:border-color .15s, box-shadow .15s}
+.ln:focus,.ln.focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(31,95,139,.15)}
+.ln.tagged{border-left:4px solid var(--accent)}
+.ln-top{display:flex;gap:10px;align-items:flex-start}
+.num{flex:0 0 auto;width:28px;height:28px;border-radius:50%;background:#efede6;color:var(--muted);display:grid;place-items:center;font-size:13px;font-weight:700}
+.sp{flex:0 0 auto;font-weight:700;padding:1px 10px;border-radius:999px;color:#fff;font-size:14px;margin-top:2px;white-space:nowrap}
+.sp.楓公爵{background:var(--sp-maple)} .sp.蓮{background:var(--sp-lotus)} .sp.果果{background:var(--sp-fruit)} .sp.蔓蔓{background:var(--sp-vine)}
+.txt{flex:1;font-size:17px}
+.ctxline{color:var(--muted);font-size:14px;padding:4px 14px;font-style:normal}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 0 38px}
+.chip{border:1.5px solid var(--line);background:#fff;border-radius:7px;padding:2px 9px;font-size:14px;color:var(--ink);display:inline-flex;gap:5px;align-items:center}
+.chip b{font-size:12px;opacity:.7}
+.chip.on{color:#fff}
+.flags{display:flex;gap:8px;margin:8px 0 0 38px;flex-wrap:wrap;align-items:center}
+.flag{border:1.5px dashed var(--line);background:#fff;border-radius:7px;padding:2px 10px;font-size:14px;color:var(--muted)}
+.flag.star.on{border-style:solid;border-color:var(--star);background:#fff6dd;color:#7a5600}
+.flag.lock.on{border-style:solid;border-color:var(--lock);background:#f4ebf9;color:var(--lock)}
+.reason{margin:8px 0 0 38px}
+.reason input{width:100%;padding:6px 10px;border:1px solid var(--star);border-radius:7px;background:#fffbef}
+.legend{position:sticky;top:76px;max-height:calc(100vh - 96px);overflow:auto;padding:16px}
+.legend h3{margin:0 0 8px;font-size:16px}
+.cat{display:grid;grid-template-columns:26px 1fr;gap:8px;padding:7px 0;border-top:1px solid var(--line)}
+.cat:first-of-type{border-top:0}
+.dot{width:24px;height:24px;border-radius:6px;color:#fff;font-weight:700;display:grid;place-items:center;font-size:13px}
+.cat .nm{font-weight:700;font-size:14px}
+.cat .rl{font-size:13px;color:var(--muted)}
+.cat .ex{font-size:12.5px;color:var(--muted);font-style:italic}
+.legend .flagdef{font-size:13px;color:var(--muted);border-top:1px solid var(--line);margin-top:6px;padding-top:8px}
+.nav{display:flex;justify-content:space-between;margin-top:18px;gap:10px}
+table{border-collapse:collapse;width:100%}
+th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:center;font-size:14px}
+th{background:#faf9f5;font-weight:700}
+td.l,th.l{text-align:left}
+.sum-block{margin:18px 0}
+.sum-block h3{margin:0 0 8px;font-size:17px}
+.status{margin-top:10px;font-size:14px}
+.status.ok{color:var(--ok)} .status.err{color:var(--warn)}
+footer{max-width:1280px;margin:10px auto 30px;padding:0 20px;color:var(--muted);font-size:13px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+footer a{color:var(--muted)}
+
+/* host */
+.host .hostbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.host .hostbar input[type=text]{padding:6px 10px;border:1px solid var(--line);border-radius:8px;min-width:340px}
+.pill{background:#efede6;border-radius:999px;padding:2px 12px;font-size:14px}
+.drop{border:2px dashed var(--line);border-radius:var(--radius);padding:14px;text-align:center;color:var(--muted);font-size:14px}
+.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.heat td.h{width:44px;font-weight:700;font-size:13px;position:relative}
+.heat td.h.ai::after{content:"";position:absolute;inset:3px;border:2.5px solid #111;border-radius:6px}
+.heat td.t{text-align:left;font-size:14.5px;max-width:520px}
+.heat td.t .why{display:block;color:#444;font-size:12.5px;margin-top:3px;background:#f3f1ea;border-radius:5px;padding:2px 6px}
+.heat td.t .reasons{display:block;color:#7a5600;font-size:12.5px;margin-top:3px}
+.heat tr.dis td.t{background:#fff3ea}
+.agree{font-size:13px}
+.agree.low{color:var(--warn);font-weight:700}
+.bars .row{display:grid;grid-template-columns:70px 1fr 54px;gap:8px;align-items:center;margin:4px 0;font-size:14px}
+.bars .bar{height:18px;border-radius:4px;background:#ece9e0;overflow:hidden}
+.bars .bar span{display:block;height:100%}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:900px){.grid2{grid-template-columns:1fr}}
+.big .heat td.t{font-size:17px} .big th,.big td{font-size:16px}
+.mini{font-size:12.5px;color:var(--muted)}
+.kbd{display:inline-block;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;font-size:12px;background:#fff}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>角色對話標記工作坊</h1>
+  <span class="who" id="who"></span>
+  <div class="tabs" id="tabs"></div>
+  <span class="spacer"></span>
+  <span class="progress" id="progress"></span>
+</header>
+
+<main id="app"></main>
+
+<footer>
+  <span>因材網國中生物教材開發團隊　月聚實作工具　<span id="ver"></span></span>
+  <span><a href="#" id="modeLink">主持人模式</a></span>
+</footer>
+
+<script>
+/* ============ 設定 ============ */
+// 部署 Apps Script 後，將網址貼在下方引號內（或以 ?api=網址 開啟本頁）
+const DEFAULT_API = "https://script.google.com/macros/s/AKfycbzL0lCEqONDjQ82FzlaGjYvrYo4NznN9omdqPFQvooM3Su-t1eHZLzgmmvy3OkLwCE92A/exec";
+const VERSION = "2026-10-v1";
+
+/* ============ 類別 ============ */
+const CATS = [
+ {id:1, short:"問題", name:"提出問題", rule:"提出想知道、需要釐清或解決的問題", ex:"「為什麼兩組會出現不同結果？」", col:"var(--c1)"},
+ {id:2, short:"想法", name:"提出想法、猜測或預測", rule:"提出可能的原因、解釋或預期結果", ex:"「我猜葉片的數量可能會影響吸水量。」", col:"var(--c2)"},
+ {id:3, short:"證據", name:"提出觀察或證據", rule:"說出觀察到的現象、資料或相關事例", ex:"「這一組的水位下降得比較多。」", col:"var(--c3)"},
+ {id:4, short:"推理", name:"推理與解釋", rule:"說明證據如何支持想法，或解釋現象為什麼、如何發生；須連結到對話中已出現的證據或想法", ex:"「這個結果比較符合甲的預測，因此目前較支持甲的解釋。」", col:"var(--c4)"},
+ {id:5, short:"質疑", name:"質疑與檢證", rule:"指出解釋可能的問題，或提出進一步查證的方法", ex:"「會不會是溫度不同？我們應該保持溫度相同再比較。」", col:"var(--c5)"},
+ {id:6, short:"整合", name:"整合與修正", rule:"整理線索，補充、修正或保留原先想法，形成暫時結論", ex:"「我原先只注意到根，現在需要把葉片的影響納入解釋。」", col:"var(--c6)"},
+ {id:7, short:"知識", name:"知識說明", rule:"提供名詞、背景知識或概念說明；內容從對話之外帶入，未連結對話中的證據", ex:"「蒸散是植物以水蒸氣形式散失水分的現象。」", col:"var(--c7)"},
+ {id:8, short:"其他", name:"其他", rule:"主要用於互動回應、情緒表達或情節推進，未明顯執行其他類別的功能", ex:"「好神奇！」「隔天早上，他們再次來到花園。」", col:"var(--c8)"},
+ {id:9, short:"評價", name:"確認或評價", rule:"判斷或評價他人說法的對錯、好壞", ex:"「沒錯！」「不是喔！」「你們都分對了！」「很好的推論。」", col:"var(--c9)"}
+];
+const SPEAKERS = ["楓公爵","蓮","果果","蔓蔓"];
+
+/* ============ 片段（ai = Claude 的對照標記；aiS = 亮點；aiL = 定案點） ============ */
+const EXCERPTS = [
+{id:"A", title:"血糖（一）：她為什麼昏倒？", src:"〈地球人沒吃飯會暈倒？〉第2至10格",
+ context:"角色透過電子成像看到地球即時影像：一位女子在院子晾衣服時突然昏倒，被送往醫院。救護人員發現餐桌上的早餐沒有吃，旁邊有注射用針筒與「胰島素」藥盒。",
+ lines:[
+ {sp:"蓮",t:"為什麼那個地球女子會昏倒？還要送去醫院？她到底怎麼了？",ai:[1],why:"提出全片的驅動問題"},
+ {sp:"蔓蔓",t:"一定是因為地球的太陽太大，曬暈了吧！",ai:[2],why:"第一個假設"},
+ {sp:"蓮",t:"是嗎？可是我上次在外面照陽光，越照精神越好！",ai:[5,3],why:"用自身經驗質疑"},
+ {sp:"蔓蔓",t:"因為你不是地球人，地球人好像很怕曬太陽。",ai:[4],why:"回應質疑，為假設辯護"},
+ {sp:"蓮",t:"所以真的是因為在院子曬太陽晾衣服，所以曬暈了？",ai:[1],why:"尋求確認"},
+ {sp:"楓公爵",t:"不是喔！你們仔細回想當時的狀況。",ai:[9,1],aiL:true,why:"未提證據即否決假設"},
+ {sp:"果果",t:"我們看到注射藥物的針筒和藥物盒？跟藥物有關？",ai:[3,2],why:"提出線索並形成新想法"},
+ {sp:"蔓蔓",t:"我知道，一定是女子注射太多藥物所以昏倒！",ai:[2],why:"新的假設"},
+ {sp:"果果",t:"是嗎？女子家裡有針筒和藥物，表示她一定知道怎麼使用藥物，怎麼可能注射太多啦！",ai:[5],aiS:true,why:"以推論質疑假設"},
+ {sp:"蓮",t:"可是我覺得蔓蔓說得有道理，女子一定是注射太多藥所以昏倒。",ai:[9,2],why:"同儕評價並附和"},
+ {sp:"楓公爵",t:"請再回想現場狀況，還有沒有什麼線索？",ai:[1],why:"引導回到證據"},
+ {sp:"果果",t:"桌上有沒吃的早餐，跟這個有關嗎？",ai:[3,1],why:"提出新線索"},
+ {sp:"楓公爵",t:"應該有關係喔！",ai:[9],why:"確認線索的相關性"},
+ {sp:"蔓蔓",t:"一定是因為女子沒吃早餐所以昏倒，就是這麼簡單。",ai:[2],why:"新的假設"},
+ {sp:"蓮",t:"很有道理，地球人沒吃東西就沒力氣，所以一下子就昏倒了。",ai:[9,4],why:"附和並補上理由"},
+ {sp:"果果",t:"可是我觀察過很多地球人都不吃早餐，也不是每個人都會昏倒啊！",ai:[3,5],aiS:true,why:"以反例排除假設"},
+ {sp:"楓公爵",t:"為什麼有些地球人沒吃早餐不會昏倒，但是這個女子卻昏倒了？",ai:[1],aiS:true,why:"把反例轉成新問題"},
+ {sp:"蔓蔓",t:"一定是沒吃早餐又亂注射藥物，所以昏倒，就是這樣。",ai:[6,2],why:"合併兩條線索"},
+ {sp:"蓮",t:"所以這個地球女子沒吃早餐，加上注射藥物，所以昏倒，是這樣嗎？",ai:[6,1],why:"整理成暫時結論並求證"},
+ {sp:"楓公爵",t:"這個推論挺合理的，你們可以解釋原因嗎？",ai:[9,1],why:"評價後要求說明機制"},
+ {sp:"蔓蔓",t:"我們看到的就是這樣，還有什麼原因？",ai:[8],why:"互動回應，未推進推理"},
+ {sp:"蓮",t:"我不知道～",ai:[8],why:"互動回應"},
+ {sp:"果果",t:"地球人的身體似乎有複雜的運作方式，我認為這個地球女子可能生病了，導致某些身體機能出問題，才造成昏倒的結果。",ai:[2],why:"提出暫時性的新假設"},
+ {sp:"楓公爵",t:"很好的推論，又有影像傳過來了，或許有更多資訊，一起看一下吧！",ai:[9,8],why:"評價並推進情節"}
+ ]},
+{id:"C", title:"內外溫：熱像儀與蓋被子", src:"〈內外有別的溫控系統〉第29至40格、第52至67格",
+ context:"跑完馬拉松後，角色討論流汗與體溫。楓公爵拿出地球人的「熱像儀」，準備觀察動物的體溫有什麼差異。",
+ lines:[
+ {sp:"楓公爵",t:"現在我們用它對準一些動物，來觀察看看有什麼現象吧！",ai:[8],why:"推進活動"},
+ {sp:"蔓蔓",t:"我看到兔子和小狗，他們的影像比環境溫度明顯的高出許多。",ai:[3],why:"說出觀察"},
+ {sp:"果果",t:"奇怪，看不到烏龜和蛇的影像欸！怎麼會這樣？",ai:[3,1],aiS:true,why:"注意到異常並提問"},
+ {sp:"楓公爵",t:"你們的發現非常棒喔！因為烏龜和蛇的體溫，與環境溫度很接近，所以熱像儀讓他們隱形了！",ai:[9,4],aiL:true,why:"評價後直接解釋異常"},
+ {sp:"蔓蔓",t:"喔！烏龜和蛇是一類動物，兔子和小狗是另外一類動物！楓公爵，他們體溫調節的方式是不是不太一樣？",ai:[2,1],why:"依觀察分類並提問"},
+ {sp:"楓公爵",t:"蔓蔓說得很好。動物世界調節體溫的方式有兩種，一種主要靠體內產生的熱能來維持體溫，像是兔子和狗，稱之為內溫動物。另外一類動物，主要靠體外的環境溫度來產生體溫，例如烏龜和蛇，稱之為外溫動物。",ai:[9,7],aiL:true,why:"評價後給出定義"},
+ {ctx:"【中略：第41至51格，討論毛髮與皮下脂肪】"},
+ {sp:"蔓蔓",t:"楓公爵，那如果夏天天氣很熱很熱的時候，或是冬天很冷很冷的時候，外溫動物怎麼辦？",ai:[1],why:"提出新問題"},
+ {sp:"楓公爵",t:"你想想你夏天的時候喜歡待在哪裡？冬天覺得很冷時又會怎麼辦呢？",ai:[1],why:"引導連結自身經驗"},
+ {sp:"果果",t:"夏天很熱很熱的時候，我就會避開太陽，躲到陰暗的地方乘涼。冬天嘛！就會多穿一些衣服囉！",ai:[3],why:"說出自身經驗"},
+ {sp:"蔓蔓",t:"所以烏龜很冷的時候他們就蓋被子？？",ai:[2],why:"由經驗類推的想法"},
+ {sp:"果果",t:"等一下，好像沒有看過烏龜蓋被子或蛇穿衣服欸……？！",ai:[5,3],aiS:true,why:"以經驗自我推翻"},
+ {sp:"楓公爵",t:"是的，外溫動物在很熱的時候，的確是會躲在陰涼處避開太陽，但是外溫動物不太能自己產生體熱，而穿衣服的用意是要保持體熱，那麼你覺得外溫動物覺得冷的時候，穿衣服會有效果嗎？",ai:[9,7,1],why:"確認、補充知識後提問"},
+ {sp:"果果",t:"自己不能產生體熱，那穿衣服就沒意義了吧！？",ai:[4],aiS:true,why:"由前提推出結論"},
+ {sp:"蔓蔓",t:"喔～難怪外溫動物體表通常沒有毛髮！",ai:[4,6],why:"連結先前觀察"},
+ {sp:"楓公爵",t:"是的。外溫動物因為自己無法產熱，所以不會有保暖的構造，更別提穿衣服的行為了。那麼你覺得天氣很冷的時候，他們會怎麼設法提高自身溫度呢？試著想想，自然環境中有哪些因素可以幫忙「加熱」呢？",ai:[9,7,1],aiL:true,why:"確認結論後提出下一題"}
+ ]},
+{id:"D", title:"酵素：口水與糯米紙", src:"〈廚房裡的魔法師－酵素（上）〉第10至18格",
+ context:"園遊會前，角色在廚房試做料理。蘋果切片變色引出「酵素」的話題，楓公爵已說明酵素的主要成分是蛋白質。",
+ lines:[
+ {sp:"蓮",t:"我還聽說早期原住民會將小米團放在口中咀嚼後吐出，靜置隔夜發酵，之後就能釀出小米酒，那小米酒裡面也有酵素嗎？",ai:[3,1],why:"帶入相關事例並提問"},
+ {sp:"楓公爵",t:"這是酵素作用的例子沒錯，只不過並不是整瓶小米酒都是酵素，酵素在這裡扮演著能促進小米內的成分代謝轉換為其他物質的角色。",ai:[9,7],aiL:true,why:"確認並說明酵素角色"},
+ {sp:"蓮",t:"那小米酒裡的酵素又是從哪來的呢？",ai:[1],why:"提出問題"},
+ {sp:"果果",t:"（喃喃自語）小米酒是咀嚼過後的小米釀造而來，小米的成分會被酵素轉換為其他物質……如果小米自己就有酵素，那應該放著就會轉變成小米酒，為什麼還要放到嘴裡咀嚼再吐出來？酵素會是從哪來的？……難道是口水！",ai:[4,2],aiS:true,why:"由矛盾推出假設"},
+ {sp:"楓公爵",t:"哈～這個推理不錯哦，來～你吐一些唾液在這個容器裡，我現在放進會墊在紅豆年糕下方的「糯米紙」，這個糯米紙跟小米成分類似，都是澱粉。",ai:[9,5],why:"評價後安排檢驗"},
+ {ctx:"【畫面：一段時間後，糯米紙變小】"},
+ {sp:"蔓蔓",t:"哇～糯米紙變小了耶！唾液這麼厲害啊，那我把一片蘋果也丟進去看看。",ai:[3,5],why:"說出結果並提出新的檢驗"},
+ {ctx:"【畫面：蘋果片放入裝有唾液的容器】"},
+ {sp:"蔓蔓",t:"怎麼這麼久了還沒變化？",ai:[3,1],why:"說出結果並提問"},
+ {sp:"蓮",t:"所以唾液只能分解糯米紙？不能分解蘋果？",ai:[2,1],why:"提出暫時的解釋"},
+ {sp:"楓公爵",t:"嚴格來說，是唾液裡的酵素只能分解澱粉。因為糯米紙是用澱粉加工製成，所以我們能很清楚的觀察到糯米紙被唾液裡的酵素分解變小。而蘋果裡有太多成分，所以沒辦法被唾液裡的酵素整個分解變小。",ai:[4,7],aiL:true,why:"由楓公爵解釋實驗結果"},
+ {sp:"蔓蔓",t:"如果有可以將蘋果整個分解掉的酵素，我要叫它……「蘋果酵素」！",ai:[2],why:"提出命名想法"},
+ {sp:"楓公爵",t:"很可惜沒有這種酵素啦，酵素通常作用的對象很專一，例如唾液裡能分解澱粉的酵素就不能拿來分解整顆蘋果，每種酵素都有它專一的對象。",ai:[9,7],aiL:true,why:"否定後說明專一性"},
+ {sp:"蔓蔓",t:"那我可以叫分解糯米紙的酵素是「糯米紙酵素」嗎？",ai:[2,1],why:"提出命名想法"},
+ {sp:"蓮",t:"飯也是澱粉成分，難道分解飯的酵素叫「飯酵素」嗎？感覺這兩種酵素是一樣的東西耶，都是分解澱粉啊！",ai:[5,4],aiS:true,why:"以類比質疑同儕"},
+ {sp:"楓公爵",t:"沒錯，蓮發現共同性了，科學家當然不希望把一樣的酵素取了這麼多不一樣的名字，所以酵素的命名是有它的基本規則，我們會以它作用的物質來命名。",ai:[9,7],aiL:true,why:"確認後說明命名規則"}
+ ]},
+{id:"B", title:"血糖（二）：一步一步討論清楚", src:"〈地球人沒吃飯會暈倒？〉第15至19格",
+ context:"接續片段一。急診報告指出女子血糖濃度過低。角色已提到血糖是血液中的葡萄糖，楓公爵也提示「跟血糖的功能有關，回想消化系統和細胞產生能量的方法」。",
+ lines:[
+ {sp:"蔓蔓",t:"一下血糖、一下葡萄糖，現在又出現呼吸作用、呼吸運動、氧氣，這跟地球女子血糖太低會昏倒有什麼關係？",ai:[1],aiS:true,why:"把對話拉回驅動問題"},
+ {sp:"楓公爵",t:"我們就一步一步討論清楚吧！首先，我們先討論葡萄糖在地球人身體中的功能吧，這個我們剛剛有說到了，由蔓蔓先回答吧！",ai:[8],why:"安排程序、點名"},
+ {sp:"蔓蔓",t:"葡萄糖是地球人細胞中產生能量的原料。",ai:[7],why:"複述知識"},
+ {sp:"楓公爵",t:"正確，非常好！再請問蓮：「葡萄糖在細胞中要如何轉變成能量？」",ai:[9,1],why:"評價後點名提問"},
+ {sp:"蓮",t:"細胞會進行呼吸作用將葡萄糖轉變成能量。",ai:[7],why:"複述知識"},
+ {sp:"楓公爵",t:"呼吸作用如何將葡萄糖轉變成能量？果果，請你更詳細說明一下。",ai:[1],why:"點名提問"},
+ {sp:"果果",t:"細胞進行呼吸作用時，以葡萄糖和氧氣為原料，兩者作用後就會產生二氧化碳、水和釋放出能量。",ai:[7],why:"複述知識"},
+ {sp:"楓公爵",t:"非常正確，細胞進行呼吸作用後會產生能量，供應細胞正常的生理活動，讓地球人的身體可以正常運作。而呼吸作用使用的氧氣是地球人透過呼吸運動吸入的，再運用血液循環系統送到細胞內使用。",ai:[9,7],aiL:true,why:"評價後補充知識"},
+ {sp:"蔓蔓",t:"哇！原來這麼複雜啊，我終於搞懂了。",ai:[8],why:"情緒回應"},
+ {sp:"蓮",t:"請問楓公爵，因為地球女子早上在院子晾衣服一直消耗能量，葡萄糖一直消耗，造成血糖濃度降低，所以造成昏倒？是這樣嗎？",ai:[4,1],aiS:true,why:"把知識連回案件"},
+ {sp:"楓公爵",t:"女子一直在做家事、晾衣服確實會造成血糖降低，但是血糖降低不一定會昏倒喔！",ai:[9,5],aiL:true,why:"部分否定並指出問題"},
+ {sp:"蔓蔓",t:"可是地球女子就昏倒啦！",ai:[5,3],aiS:true,why:"以事實反駁"}
+ ]}
+];
+const ORDER = ["A","C","D","B"];
+const LABEL = {A:"片段一",C:"片段二",D:"片段三",B:"片段四"};
+const EX = Object.fromEntries(EXCERPTS.map(e=>[e.id,e]));
+// 為每個片段的發言編號（略過旁白）
+EXCERPTS.forEach(e=>{let k=0;e.lines.forEach(l=>{if(!l.ctx){k++;l.n=k;}});e.count=k;});
+
+/* ============ 工具 ============ */
+const $ = (s,r=document)=>r.querySelector(s);
+const esc = s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const store = {
+  get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},
+  set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+};
+const params = new URLSearchParams(location.search);
+function apiUrl(){ return params.get("api") || store.get("wk_api") || DEFAULT_API || ""; }
+function catById(id){return CATS.find(c=>c.id===id)}
+function download(name, obj){
+  const blob = new Blob([JSON.stringify(obj,null,1)],{type:"application/json"});
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);
+}
+$("#ver").textContent = VERSION;
+
+/* ============ 參與者模式 ============ */
+const SKEY = "wk_state_"+VERSION;
+let S = store.get(SKEY) || {id: "p"+Math.random().toString(36).slice(2,10), name:"", tags:{}, view:"intro", submittedAt:null};
+let focusIdx = -1;
+function save(){store.set(SKEY,S)}
+function T(ex,n){ S.tags[ex] = S.tags[ex]||{}; S.tags[ex][n] = S.tags[ex][n]||{c:[],s:false,r:"",l:false}; return S.tags[ex][n]; }
+function isTagged(ex,n){ const t=S.tags[ex]&&S.tags[ex][n]; return !!(t && t.c.length); }
+function doneCount(ex){ let k=0; for(let i=1;i<=EX[ex].count;i++) if(isTagged(ex,i)) k++; return k; }
+function totalDone(){ return ORDER.reduce((a,e)=>a+doneCount(e),0) }
+function totalLines(){ return ORDER.reduce((a,e)=>a+EX[e].count,0) }
+
+function renderHeader(){
+  $("#who").textContent = S.name ? "標記者："+S.name : "";
+  const tabs = $("#tabs"); tabs.innerHTML="";
+  if(S.view==="intro"){ $("#progress").textContent=""; return; }
+  ORDER.forEach(e=>{
+    const b=document.createElement("button"); b.className="tab"+(S.view===e?" on":"");
+    b.innerHTML = esc(LABEL[e])+`<span class="done">${doneCount(e)}/${EX[e].count}</span>`;
+    b.onclick=()=>{S.view=e;save();render();window.scrollTo(0,0)}; tabs.appendChild(b);
+  });
+  const b=document.createElement("button"); b.className="tab"+(S.view==="summary"?" on":"");
+  b.textContent="完成與送出"; b.onclick=()=>{S.view="summary";save();render();window.scrollTo(0,0)}; tabs.appendChild(b);
+  $("#progress").textContent = `已標記 ${totalDone()} / ${totalLines()} 句`;
+}
+
+function legendHTML(){
+  return `<aside class="card legend"><h3>類別說明</h3>
+  ${CATS.map(c=>`<div class="cat"><div class="dot" style="background:${c.col}">${c.id}</div><div>
+    <div class="nm">${esc(c.name)}</div><div class="rl">${esc(c.rule)}</div><div class="ex">${esc(c.ex)}</div></div></div>`).join("")}
+  <div class="flagdef"><b>⭐ 亮點</b>：這一句讓你覺得角色真的在思考。請寫一句理由。<br>
+  <b>🔒 定案點</b>：答案或結論在這一句被確定。<br><br>
+  快速鍵：點選一句後，按 <span class="kbd">1</span>–<span class="kbd">9</span> 切換類別，<span class="kbd">S</span> 亮點，<span class="kbd">L</span> 定案點，<span class="kbd">↑</span><span class="kbd">↓</span> 換句。</div></aside>`;
+}
+
+function renderIntro(){
+  $("#app").innerHTML = `<div class="card intro" style="max-width:820px;margin:0 auto">
+   <h2>誰在推理？什麼決定了答案？</h2>
+   <p>今天我們用團隊既有腳本中的四個片段，逐句檢視角色對話的功能。這些片段來自團隊教師在導入AI之前完成的腳本，目的是一起觀察我們寫作時的共同模式，而不是評比個別作品。</p>
+   <ol>
+     <li><b>請獨立標記</b>，先不與旁邊的老師討論。大家的判斷不同，正是稍後討論的材料。</li>
+     <li>每一句請勾選它的<b>功能類別</b>。一句話可以有兩種以上的功能，但通常一到兩類即可。</li>
+     <li>另有兩個獨立標記：<b>⭐ 亮點</b>（這一句讓你覺得角色真的在思考，請寫一句理由）與 <b>🔒 定案點</b>（答案或結論在這一句被確定）。兩者都不是每句必標。</li>
+     <li>四個片段依序完成後，到「完成與送出」頁送出結果。</li>
+   </ol>
+   <p class="hint">標記內容會自動保存在這台電腦的瀏覽器中，關閉頁面後再開啟仍可接續。</p>
+   <div class="field"><label for="nm"><b>您的姓名或代號</b></label>
+     <input id="nm" value="${esc(S.name)}" placeholder="例如：王老師"><button class="btn" id="go">開始標記</button></div>
+  </div>`;
+  $("#go").onclick=()=>{const v=$("#nm").value.trim(); if(!v){$("#nm").focus();return;} S.name=v; S.view=ORDER[0]; save(); render();};
+  $("#nm").onkeydown=e=>{if(e.key==="Enter")$("#go").click()};
+}
+
+function lineCardHTML(ex,l){
+  if(l.ctx) return `<div class="ctxline">${esc(l.ctx)}</div>`;
+  const t = (S.tags[ex]&&S.tags[ex][l.n]) || {c:[],s:false,r:"",l:false};
+  return `<div class="ln${t.c.length?" tagged":""}" tabindex="0" data-n="${l.n}">
+    <div class="ln-top"><span class="num">${l.n}</span><span class="sp ${esc(l.sp)}">${esc(l.sp)}</span><span class="txt">${esc(l.t)}</span></div>
+    <div class="chips">${CATS.map(c=>{const on=t.c.includes(c.id);
+      return `<button class="chip${on?" on":""}" data-c="${c.id}" style="${on?`background:${c.col};border-color:${c.col}`:`border-color:${c.col}55`}" title="${esc(c.name)}：${esc(c.rule)}"><b>${c.id}</b>${esc(c.short)}</button>`}).join("")}</div>
+    <div class="flags"><button class="flag star${t.s?" on":""}" data-f="s">⭐ 亮點</button><button class="flag lock${t.l?" on":""}" data-f="l">🔒 定案點</button></div>
+    ${t.s?`<div class="reason"><input data-r="1" value="${esc(t.r)}" placeholder="為什麼這一句讓你覺得角色真的在思考？"></div>`:""}
+  </div>`;
+}
+
+function renderExcerpt(ex){
+  const e = EX[ex]; const idx = ORDER.indexOf(ex);
+  $("#app").innerHTML = `<div class="layout"><section>
+    <div class="card excerpt-head"><h2>${esc(LABEL[ex])}｜${esc(e.title)}</h2><div class="src">${esc(e.src)}</div>
+      <div class="context">${esc(e.context)}</div>
+      <div class="hint">點選類別按鈕可多選，再按一次可取消。</div></div>
+    <div class="lines" id="lines">${e.lines.map(l=>lineCardHTML(ex,l)).join("")}</div>
+    <div class="nav">${idx>0?`<button class="btn ghost" id="prev">← ${esc(LABEL[ORDER[idx-1]])}</button>`:"<span></span>"}
+      ${idx<ORDER.length-1?`<button class="btn" id="next">${esc(LABEL[ORDER[idx+1]])} →</button>`:`<button class="btn" id="next">完成與送出 →</button>`}</div>
+  </section>${legendHTML()}</div>`;
+  if($("#prev")) $("#prev").onclick=()=>{S.view=ORDER[idx-1];save();render();window.scrollTo(0,0)};
+  $("#next").onclick=()=>{S.view= idx<ORDER.length-1?ORDER[idx+1]:"summary";save();render();window.scrollTo(0,0)};
+  bindLines(ex);
+}
+
+function refreshCard(ex,n){
+  const old = document.querySelector(`.ln[data-n="${n}"]`); if(!old) return;
+  const l = EX[ex].lines.find(x=>x.n===n);
+  const wrap=document.createElement("div"); wrap.innerHTML=lineCardHTML(ex,l); const nu=wrap.firstElementChild;
+  old.replaceWith(nu); bindCard(ex,nu); nu.classList.add("focus");
+  renderHeader();
+}
+function toggleCat(ex,n,c){ const t=T(ex,n); t.c = t.c.includes(c)? t.c.filter(x=>x!==c) : [...t.c,c].sort((a,b)=>a-b); save(); refreshCard(ex,n); focusCard(n); }
+function toggleFlag(ex,n,f){ const t=T(ex,n); t[f]=!t[f]; save(); refreshCard(ex,n); if(f==="s"&&t.s){const i=document.querySelector(`.ln[data-n="${n}"] input[data-r]`); if(i) i.focus(); } else focusCard(n); }
+function focusCard(n){ const el=document.querySelector(`.ln[data-n="${n}"]`); if(el){ document.querySelectorAll(".ln.focus").forEach(x=>x!==el&&x.classList.remove("focus")); el.classList.add("focus"); if(document.activeElement?.tagName!=="INPUT") el.focus({preventScroll:true}); focusIdx=n; } }
+function bindCard(ex,card){
+  const n = +card.dataset.n;
+  card.addEventListener("click",ev=>{
+    const chip=ev.target.closest(".chip"); const flag=ev.target.closest(".flag");
+    if(chip){toggleCat(ex,n,+chip.dataset.c);return}
+    if(flag){toggleFlag(ex,n,flag.dataset.f);return}
+    if(!ev.target.closest("input")) focusCard(n);
+  });
+  const inp = card.querySelector("input[data-r]");
+  if(inp){ inp.addEventListener("input",()=>{T(ex,n).r=inp.value;save();}); inp.addEventListener("keydown",e=>{e.stopPropagation(); if(e.key==="Enter"||e.key==="Escape"){card.focus();}}); }
+  card.addEventListener("focus",()=>{focusIdx=n; document.querySelectorAll(".ln.focus").forEach(x=>x!==card&&x.classList.remove("focus")); card.classList.add("focus");});
+}
+function bindLines(ex){ document.querySelectorAll(".ln").forEach(c=>bindCard(ex,c)); }
+document.addEventListener("keydown",e=>{
+  if(!ORDER.includes(S.view) || document.activeElement?.tagName==="INPUT" || e.ctrlKey||e.metaKey||e.altKey) return;
+  const ex=S.view; const max=EX[ex].count; if(focusIdx<1) return;
+  if(/^[1-9]$/.test(e.key)){ e.preventDefault(); toggleCat(ex,focusIdx,+e.key); }
+  else if(e.key==="s"||e.key==="S"){ e.preventDefault(); toggleFlag(ex,focusIdx,"s"); }
+  else if(e.key==="l"||e.key==="L"){ e.preventDefault(); toggleFlag(ex,focusIdx,"l"); }
+  else if(e.key==="ArrowDown"||e.key==="j"){ if(focusIdx<max){e.preventDefault(); focusCard(focusIdx+1); document.querySelector(`.ln[data-n="${focusIdx}"]`)?.scrollIntoView({block:"center",behavior:"smooth"});} }
+  else if(e.key==="ArrowUp"||e.key==="k"){ if(focusIdx>1){e.preventDefault(); focusCard(focusIdx-1); document.querySelector(`.ln[data-n="${focusIdx}"]`)?.scrollIntoView({block:"center",behavior:"smooth"});} }
+});
+
+/* 統計（單人或AI） */
+function speakerMatrix(ex, getTag){ // returns {sp:{cat:count}, lockBy:{sp:n}, starBy:{sp:n}, turns:{sp:n}}
+  const m={}, lockBy={}, starBy={}, turns={};
+  SPEAKERS.forEach(s=>{m[s]={};CATS.forEach(c=>m[s][c.id]=0);lockBy[s]=0;starBy[s]=0;turns[s]=0;});
+  EX[ex].lines.forEach(l=>{ if(l.ctx) return; turns[l.sp]++; const t=getTag(l); if(!t) return;
+    (t.c||[]).forEach(c=>m[l.sp][c]++); if(t.l) lockBy[l.sp]++; if(t.s) starBy[l.sp]++; });
+  return {m,lockBy,starBy,turns};
+}
+function matrixTable(mat, opts={}){
+  const max = Math.max(1,...SPEAKERS.flatMap(s=>CATS.map(c=>mat.m[s][c.id])));
+  const f = v=> opts.avg? v.toFixed(1).replace(/\.0$/,"") : v;
+  return `<table><tr><th class="l">角色</th><th>發言</th>${CATS.map(c=>`<th title="${esc(c.name)}"><span class="dot" style="background:${c.col};display:inline-grid;width:20px;height:20px;font-size:11px">${c.id}</span><div class="mini">${esc(c.short)}</div></th>`).join("")}<th>🔒</th><th>⭐</th></tr>
+  ${SPEAKERS.map(s=>`<tr><td class="l"><span class="sp ${s}">${s}</span></td><td>${mat.turns[s]}</td>
+   ${CATS.map(c=>{const v=mat.m[s][c.id]; const a=v/max; return `<td style="background:rgba(31,95,139,${(a*0.55).toFixed(2)});${a>0.6?"color:#fff;":""}">${v?f(v):"·"}</td>`}).join("")}
+   <td>${mat.lockBy[s]?f(mat.lockBy[s]):"·"}</td><td>${mat.starBy[s]?f(mat.starBy[s]):"·"}</td></tr>`).join("")}</table>`;
+}
+
+function payload(){
+  const flat=[];
+  ORDER.forEach(ex=>EX[ex].lines.forEach(l=>{ if(l.ctx) return; const t=(S.tags[ex]||{})[l.n];
+    flat.push({ex, label:LABEL[ex], n:l.n, sp:l.sp, c:(t&&t.c)||[], s:!!(t&&t.s), r:(t&&t.r)||"", l:!!(t&&t.l)}); }));
+  return {kind:"wk-submission", version:VERSION, id:S.id, name:S.name, ts:new Date().toISOString(), tags:S.tags, flat};
+}
+
+function renderSummary(){
+  const missing = ORDER.map(e=>{const a=[];for(let i=1;i<=EX[e].count;i++) if(!isTagged(e,i)) a.push(i); return a.length?`${LABEL[e]}：第 ${a.join("、")} 句`:null}).filter(Boolean);
+  const api = apiUrl();
+  $("#app").innerHTML = `<div class="card" style="max-width:1000px;margin:0 auto">
+   <h2 style="margin-top:0">完成與送出</h2>
+   ${missing.length?`<p class="status err">尚未標記：${missing.map(esc).join("；")}。未標記也可以送出，主持人彙整時會略過這些句子。</p>`:`<p class="status ok">四個片段都已標記完成。</p>`}
+   <p>下表是您自己的標記結果：每個角色在各類別被標記的次數。可以先看看自己的結果有沒有呈現什麼模式。</p>
+   ${ORDER.map(e=>`<div class="sum-block"><h3>${esc(LABEL[e])}｜${esc(EX[e].title)}</h3>${matrixTable(speakerMatrix(e,l=>(S.tags[e]||{})[l.n]))}</div>`).join("")}
+   <div class="field">
+     ${api?`<button class="btn" id="send">送出到團隊試算表</button>`:""}
+     <button class="btn ghost" id="dl">下載結果檔</button>
+   </div>
+   <div id="sendStatus" class="status">${S.submittedAt?`上次送出時間：${new Date(S.submittedAt).toLocaleString("zh-TW")}（可修改後重新送出，系統會保留最新一次）`:""}</div>
+   ${api?"":`<p class="hint">本頁尚未設定試算表網址，請按「下載結果檔」後，把檔案傳給主持人。</p>`}
+  </div>`;
+  $("#dl").onclick=()=>download(`標記_${S.name||"未命名"}.json`, payload());
+  if($("#send")) $("#send").onclick=async()=>{
+    const st=$("#sendStatus"); st.className="status"; st.textContent="送出中……";
+    try{
+      await fetch(api,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(payload())});
+      S.submittedAt=new Date().toISOString(); save();
+      st.className="status ok"; st.textContent="已送出。若主持人端沒有看到您的資料，請改按「下載結果檔」，把檔案傳給主持人。";
+    }catch(err){ st.className="status err"; st.textContent="送出失敗（可能是網路問題）。請按「下載結果檔」，把檔案傳給主持人。"; }
+  };
+}
+
+/* ============ 主持人模式 ============ */
+let H = {subs:{}, ex:"A", showAI:false, big:false};
+function addSubs(list){
+  (Array.isArray(list)?list:[list]).forEach(p=>{ if(!p||p.kind!=="wk-submission"||!p.id) return;
+    const prev=H.subs[p.id]; if(!prev || prev.ts < p.ts) H.subs[p.id]=p; });
+}
+function subsArr(){return Object.values(H.subs)}
+function tagOf(p,ex,n){ return (p.tags&&p.tags[ex]&&p.tags[ex][n]) || null; }
+function jacc(a,b){ const A=new Set(a),B=new Set(b); if(!A.size&&!B.size) return 1; let i=0; A.forEach(x=>B.has(x)&&i++); return i/(A.size+B.size-i); }
+
+function lineStats(ex,l){
+  const ps = subsArr().filter(p=>{const t=tagOf(p,ex,l.n);return t&&t.c&&t.c.length});
+  const N=ps.length; const pc={}; CATS.forEach(c=>pc[c.id]=0);
+  let stars=0,locks=0; const reasons=[];
+  ps.forEach(p=>{const t=tagOf(p,ex,l.n); t.c.forEach(c=>pc[c]++);});
+  subsArr().forEach(p=>{const t=tagOf(p,ex,l.n); if(t&&t.s){stars++; if(t.r) reasons.push(t.r);} if(t&&t.l) locks++;});
+  let pair=0,sum=0; for(let i=0;i<N;i++)for(let j=i+1;j<N;j++){pair++;sum+=jacc(tagOf(ps[i],ex,l.n).c,tagOf(ps[j],ex,l.n).c);}
+  const agree = pair? sum/pair : null;
+  const majority = CATS.filter(c=>N && pc[c.id]/N>=0.5).map(c=>c.id);
+  return {N,pc,stars,locks,reasons,agree,majority};
+}
+
+function renderHost(){
+  document.body.classList.add("host"); document.body.classList.toggle("big",H.big);
+  $("#who").textContent="主持人模式"; $("#progress").textContent="";
+  const tabs=$("#tabs"); tabs.innerHTML="";
+  [...ORDER.map(e=>[e,LABEL[e]]),["ALL","總覽：誰推理、誰定案"]].forEach(([k,lab])=>{
+    const b=document.createElement("button"); b.className="tab"+(H.ex===k?" on":""); b.textContent=lab;
+    b.onclick=()=>{H.ex=k;renderHost()}; tabs.appendChild(b); });
+  const N=subsArr().length;
+  $("#app").innerHTML = `<div class="hostbar">
+     <span class="pill">已匯入 <b>${N}</b> 位</span>
+     <input type="text" id="api" placeholder="Apps Script 網址" value="${esc(apiUrl())}">
+     <button class="btn small" id="fetch">從試算表讀取</button>
+     <label class="btn small ghost" style="display:inline-flex;align-items:center">匯入結果檔<input type="file" id="files" accept=".json,application/json" multiple class="hidden"></label>
+     <button class="btn small ${H.showAI?"":"ghost"}" id="ai">${H.showAI?"隱藏 AI 標記":"揭曉 AI 標記"}</button>
+     <button class="btn small ghost" id="big">${H.big?"一般字級":"放大字級"}</button>
+     <button class="btn small ghost" id="demo" title="產生模擬資料，供會前演練">模擬資料</button>
+     <button class="btn small ghost" id="clear">清除</button>
+     <span id="hstatus" class="mini"></span>
+   </div>
+   <div class="drop" id="drop">也可以把老師們的結果檔（.json）直接拖曳到這裡</div>
+   <div id="hview" style="margin-top:16px"></div>`;
+  $("#fetch").onclick=fetchApi;
+  $("#api").onchange=()=>store.set("wk_api",$("#api").value.trim());
+  $("#files").onchange=e=>readFiles(e.target.files);
+  $("#ai").onclick=()=>{H.showAI=!H.showAI;renderHost()};
+  $("#big").onclick=()=>{H.big=!H.big;renderHost()};
+  $("#demo").onclick=()=>{addSubs(makeDemo(8));renderHost()};
+  $("#clear").onclick=()=>{if(confirmClear()){H.subs={};renderHost()}};
+  const d=$("#drop");
+  d.ondragover=e=>{e.preventDefault();d.classList.add("over")}; d.ondragleave=()=>d.classList.remove("over");
+  d.ondrop=e=>{e.preventDefault();d.classList.remove("over");readFiles(e.dataTransfer.files)};
+  if(!N){ $("#hview").innerHTML=`<div class="card"><p>尚無資料。請按「從試算表讀取」，或匯入老師們傳來的結果檔。</p><p class="mini">會前演練可按「模擬資料」產生8位虛擬標記者（依 AI 標記加入隨機差異），正式使用前再按「清除」。</p></div>`; return; }
+  H.ex==="ALL" ? renderOverview() : renderHeat(H.ex);
+}
+let clearArmed=0;
+function confirmClear(){ const now=Date.now(); if(now-clearArmed<3000){clearArmed=0;return true;} clearArmed=now; $("#hstatus").textContent="再按一次「清除」以確認"; return false; }
+async function fetchApi(){
+  const url=$("#api").value.trim(); store.set("wk_api",url); const st=$("#hstatus");
+  if(!url){st.textContent="請先貼上 Apps Script 網址";return}
+  st.textContent="讀取中……";
+  try{ const r=await fetch(url+(url.includes("?")?"&":"?")+"t="+Date.now()); const j=await r.json(); addSubs(j.submissions||j); renderHost(); $("#hstatus").textContent="已更新 "+new Date().toLocaleTimeString("zh-TW"); }
+  catch(e){ st.textContent="讀取失敗。可在新分頁開啟該網址，將內容另存為 .json 後匯入。"; }
+}
+function readFiles(fl){
+  [...fl].forEach(f=>{const r=new FileReader(); r.onload=()=>{try{addSubs(JSON.parse(r.result)); renderHost();}catch(e){$("#hstatus").textContent=f.name+" 無法讀取";}}; r.readAsText(f);});
+}
+
+function renderHeat(ex){
+  const e=EX[ex]; let rows="", aiAgreeSum=0, aiAgreeN=0, agreeSum=0, agreeN=0;
+  e.lines.forEach(l=>{
+    if(l.ctx){ rows+=`<tr><td colspan="${CATS.length+5}" class="t mini">${esc(l.ctx)}</td></tr>`; return; }
+    const st=lineStats(ex,l);
+    if(st.agree!=null){agreeSum+=st.agree;agreeN++;}
+    if(st.N){ aiAgreeSum+=jacc(l.ai,st.majority); aiAgreeN++; }
+    const dis = st.agree!=null && st.agree<0.5;
+    rows+=`<tr class="${dis?"dis":""}"><td>${l.n}</td><td><span class="sp ${l.sp}">${l.sp}</span></td>
+     <td class="t">${esc(l.t)}${H.showAI?`<span class="why">AI：${l.ai.map(c=>c+catById(c).short).join("＋")}${l.aiS?"　⭐":""}${l.aiL?"　🔒":""}｜${esc(l.why)}</span>`:""}${st.reasons.length?`<span class="reasons">⭐ ${st.reasons.map(esc).join("／")}</span>`:""}</td>
+     ${CATS.map(c=>{const p=st.N?st.pc[c.id]/st.N:0; const ai=H.showAI&&l.ai.includes(c.id);
+       return `<td class="h${ai?" ai":""}" style="background:${p?`color-mix(in srgb, ${c.col} ${Math.round(p*100)}%, white)`:"transparent"};${p>0.55?"color:#fff":""}">${p?Math.round(p*100):""}</td>`}).join("")}
+     <td>${st.stars||""}</td><td>${st.locks||""}</td>
+     <td class="agree${dis?" low":""}">${st.agree==null?"—":Math.round(st.agree*100)+"%"}</td></tr>`;
+  });
+  $("#hview").innerHTML=`<div class="card">
+   <div class="excerpt-head"><h2>${esc(LABEL[ex])}｜${esc(e.title)}</h2><div class="src">${esc(e.src)}</div></div>
+   <p class="mini">格內數字＝勾選該類別的老師百分比。「一致度」＝每兩位老師標記的重疊程度平均（Jaccard），低於50%以底色標示，可優先討論。${H.showAI?"黑框＝AI 標記的類別。":""}</p>
+   <p><span class="pill">全段平均一致度：${agreeN?Math.round(agreeSum/agreeN*100)+"%":"—"}</span>
+   ${H.showAI?`　<span class="pill">AI 與多數老師的一致程度：${aiAgreeN?Math.round(aiAgreeSum/aiAgreeN*100)+"%":"—"}</span>`:""}</p>
+   <div style="overflow-x:auto"><table class="heat"><tr><th>#</th><th>角色</th><th class="l">臺詞</th>
+   ${CATS.map(c=>`<th title="${esc(c.name)}"><span class="dot" style="background:${c.col};display:inline-grid;width:20px;height:20px;font-size:11px">${c.id}</span><div class="mini">${esc(c.short)}</div></th>`).join("")}
+   <th>⭐</th><th>🔒</th><th>一致度</th></tr>${rows}</table></div></div>`;
+}
+
+function avgMatrix(ex){
+  const ps=subsArr(); const out=speakerMatrix(ex,()=>null);
+  SPEAKERS.forEach(s=>{CATS.forEach(c=>out.m[s][c.id]=0);out.lockBy[s]=0;out.starBy[s]=0;});
+  ps.forEach(p=>{const one=speakerMatrix(ex,l=>tagOf(p,ex,l.n)); SPEAKERS.forEach(s=>{CATS.forEach(c=>out.m[s][c.id]+=one.m[s][c.id]/ps.length); out.lockBy[s]+=one.lockBy[s]/ps.length; out.starBy[s]+=one.starBy[s]/ps.length;});});
+  return out;
+}
+function barsHTML(title, counts, color){
+  const tot=SPEAKERS.reduce((a,s)=>a+counts[s],0)||1;
+  return `<div class="bars"><div class="mini" style="margin-bottom:4px">${title}</div>${SPEAKERS.map(s=>{const p=counts[s]/tot;
+   return `<div class="row"><span class="sp ${s}" style="text-align:center">${s}</span><div class="bar"><span style="width:${(p*100).toFixed(1)}%;background:${color}"></span></div><span class="mini">${Math.round(p*100)}%</span></div>`}).join("")}</div>`;
+}
+function renderOverview(){
+  const ps=subsArr(); const sumLock={},sumStar={},sumCat={}; SPEAKERS.forEach(s=>{sumLock[s]=0;sumStar[s]=0;sumCat[s]={};CATS.forEach(c=>sumCat[s][c.id]=0)});
+  const aiLock={},aiStar={}; SPEAKERS.forEach(s=>{aiLock[s]=0;aiStar[s]=0});
+  ORDER.forEach(ex=>{ const a=avgMatrix(ex); const ai=speakerMatrix(ex,l=>({c:l.ai,s:l.aiS,l:l.aiL}));
+    SPEAKERS.forEach(s=>{sumLock[s]+=a.lockBy[s];sumStar[s]+=a.starBy[s];aiLock[s]+=ai.lockBy[s];aiStar[s]+=ai.starBy[s];CATS.forEach(c=>sumCat[s][c.id]+=a.m[s][c.id])}); });
+  const catBars = (ids,title,color)=>{const counts={};SPEAKERS.forEach(s=>counts[s]=ids.reduce((a,id)=>a+sumCat[s][id],0));return barsHTML(title,counts,color)};
+  $("#hview").innerHTML=`<div class="card"><h2 style="margin-top:0">總覽：誰在推理？什麼決定答案？</h2>
+   <p class="mini">依 ${ps.length} 位老師的標記，合計四個片段，計算各角色所占比例。</p>
+   <div class="grid2">
+     <div>${catBars([2,3,4,5,6],"想法、證據、推理、質疑、整合（第2至6類）由誰說出","var(--c4)")}</div>
+     <div>${catBars([7,9],"知識說明與確認評價（第7、9類）由誰說出","var(--c9)")}</div>
+     <div>${barsHTML("🔒 定案點由誰說出",sumLock,"var(--lock)")}</div>
+     <div>${barsHTML("⭐ 亮點由誰說出",sumStar,"var(--star)")}</div>
+     ${H.showAI?`<div>${barsHTML("AI：🔒 定案點由誰說出",aiLock,"#555")}</div><div>${barsHTML("AI：⭐ 亮點由誰說出",aiStar,"#555")}</div>`:""}
+   </div></div>
+   ${ORDER.map(ex=>`<div class="card" style="margin-top:14px"><h3 style="margin-top:0">${esc(LABEL[ex])}｜${esc(EX[ex].title)}　<span class="mini">每位老師平均標記次數</span></h3>${matrixTable(avgMatrix(ex),{avg:true})}
+     ${H.showAI?`<div class="mini" style="margin:10px 0 4px">AI 標記</div>${matrixTable(speakerMatrix(ex,l=>({c:l.ai,s:l.aiS,l:l.aiL})))}`:""}</div>`).join("")}`;
+}
+
+function makeDemo(k){
+  const out=[]; let seed=7; const rnd=()=>{seed=(seed*9301+49297)%233280;return seed/233280};
+  for(let i=0;i<k;i++){ const tags={};
+    EXCERPTS.forEach(e=>{tags[e.id]={}; e.lines.forEach(l=>{ if(l.ctx) return; let c=[...l.ai];
+      if(rnd()<0.35&&c.length>1) c=c.slice(0,1);
+      if(rnd()<0.3){ const alt=1+Math.floor(rnd()*9); if(!c.includes(alt)) c.push(alt); }
+      if(rnd()<0.15) c=[1+Math.floor(rnd()*9)];
+      tags[e.id][l.n]={c:[...new Set(c)].sort(),s:l.aiS?rnd()<0.7:rnd()<0.06,r:"",l:l.aiL?rnd()<0.75:rnd()<0.05}; }); });
+    out.push({kind:"wk-submission",version:VERSION,id:"demo"+i,name:"模擬"+(i+1),ts:new Date().toISOString(),tags});
+  }
+  return out;
+}
+
+/* ============ 路由 ============ */
+const isHost = params.has("host");
+$("#modeLink").textContent = isHost? "返回標記模式" : "主持人模式";
+$("#modeLink").onclick = e=>{e.preventDefault(); const u=new URL(location.href); isHost?u.searchParams.delete("host"):u.searchParams.set("host","1"); location.href=u.toString();};
+function render(){
+  if(isHost) return renderHost();
+  renderHeader();
+  if(S.view==="intro"||!S.name) {S.view="intro"; renderHeader(); return renderIntro();}
+  if(S.view==="summary") return renderSummary();
+  renderExcerpt(S.view);
+}
+render();
+</script>
+</body>
+</html>
