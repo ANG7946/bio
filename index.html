@@ -126,14 +126,16 @@ footer a{color:var(--muted)}
 
 <footer>
   <span>因材網國中生物教材開發團隊　月聚實作工具　<span id="ver"></span></span>
-  <span><a href="#" id="modeLink">主持人模式</a></span>
+  <span><a href="#" id="modeLink" class="hidden">返回標記模式</a></span>
 </footer>
 
 <script>
 /* ============ 設定 ============ */
 // 部署 Apps Script 後，將網址貼在下方引號內（或以 ?api=網址 開啟本頁）
-const DEFAULT_API = "https://script.google.com/macros/s/AKfycbzL0lCEqONDjQ82FzlaGjYvrYo4NznN9omdqPFQvooM3Su-t1eHZLzgmmvy3OkLwCE92A/exec";
+const DEFAULT_API = "";
 const VERSION = "2026-10-v1";
+// 主持人模式通關碼：以 ?host=通關碼 開啟本頁才會進入主持人模式（請自行修改）
+const HOST_KEY = "maple1024";
 
 /* ============ 類別 ============ */
 const CATS = [
@@ -281,6 +283,8 @@ function renderHeader(){
   });
   const b=document.createElement("button"); b.className="tab"+(S.view==="summary"?" on":"");
   b.textContent="完成與送出"; b.onclick=()=>{S.view="summary";save();render();window.scrollTo(0,0)}; tabs.appendChild(b);
+  const c=document.createElement("button"); c.className="tab"+(S.view==="compare"?" on":"");
+  c.textContent="與大家比較"; c.onclick=()=>{S.view="compare";save();render();window.scrollTo(0,0)}; tabs.appendChild(c);
   $("#progress").textContent = `已標記 ${totalDone()} / ${totalLines()} 句`;
 }
 
@@ -306,10 +310,17 @@ function renderIntro(){
    <p class="hint">標記內容會自動保存在這台電腦的瀏覽器中，關閉頁面後再開啟仍可接續。</p>
    <div class="field"><label for="nm"><b>您的姓名或代號</b></label>
      <input id="nm" value="${esc(S.name)}" placeholder="例如：王老師"><button class="btn" id="go">開始標記</button></div>
+   <p class="hint">換了電腦？<label style="color:var(--accent);cursor:pointer;text-decoration:underline">載入我先前下載的結果檔<input type="file" id="mine" accept=".json,application/json" class="hidden"></label>，即可接續或查看比較。</p>
   </div>`;
+  $("#mine").onchange=e=>loadMine(e.target.files[0]);
   $("#go").onclick=()=>{const v=$("#nm").value.trim(); if(!v){$("#nm").focus();return;} S.name=v; S.view=ORDER[0]; save(); render();};
   $("#nm").onkeydown=e=>{if(e.key==="Enter")$("#go").click()};
 }
+
+function loadMine(f){ if(!f) return; const r=new FileReader();
+  r.onload=()=>{ try{ const p=JSON.parse(r.result); if(p.kind!=="wk-submission") throw 0;
+    S.id=p.id; S.name=p.name; S.tags=p.tags||{}; S.view="summary"; save(); render(); }catch(e){ alert("這不是標記結果檔"); } };
+  r.readAsText(f); }
 
 function lineCardHTML(ex,l){
   if(l.ctx) return `<div class="ctxline">${esc(l.ctx)}</div>`;
@@ -401,16 +412,19 @@ function renderSummary(){
   $("#app").innerHTML = `<div class="card" style="max-width:1000px;margin:0 auto">
    <h2 style="margin-top:0">完成與送出</h2>
    ${missing.length?`<p class="status err">尚未標記：${missing.map(esc).join("；")}。未標記也可以送出，主持人彙整時會略過這些句子。</p>`:`<p class="status ok">四個片段都已標記完成。</p>`}
-   <p>下表是您自己的標記結果：每個角色在各類別被標記的次數。可以先看看自己的結果有沒有呈現什麼模式。</p>
-   ${ORDER.map(e=>`<div class="sum-block"><h3>${esc(LABEL[e])}｜${esc(EX[e].title)}</h3>${matrixTable(speakerMatrix(e,l=>(S.tags[e]||{})[l.n]))}</div>`).join("")}
+   <p>下表是您自己的標記結果：每個角色在各類別被標記的次數。可以先看看自己的結果有沒有呈現什麼模式。下方另有逐句回顧。</p>
+   ${ORDER.map(e=>`<div class="sum-block"><h3>${esc(LABEL[e])}｜${esc(EX[e].title)}</h3>${matrixTable(speakerMatrix(e,l=>(S.tags[e]||{})[l.n]))}
+     <details style="margin-top:8px"><summary class="mini" style="cursor:pointer">逐句回顧</summary>${reviewTable(e)}</details></div>`).join("")}
    <div class="field">
      ${api?`<button class="btn" id="send">送出到團隊試算表</button>`:""}
      <button class="btn ghost" id="dl">下載結果檔</button>
+     <button class="btn ghost" id="cmp">與大家比較 →</button>
    </div>
    <div id="sendStatus" class="status">${S.submittedAt?`上次送出時間：${new Date(S.submittedAt).toLocaleString("zh-TW")}（可修改後重新送出，系統會保留最新一次）`:""}</div>
    ${api?"":`<p class="hint">本頁尚未設定試算表網址，請按「下載結果檔」後，把檔案傳給主持人。</p>`}
   </div>`;
   $("#dl").onclick=()=>download(`標記_${S.name||"未命名"}.json`, payload());
+  $("#cmp").onclick=()=>{S.view="compare";save();render();window.scrollTo(0,0)};
   if($("#send")) $("#send").onclick=async()=>{
     const st=$("#sendStatus"); st.className="status"; st.textContent="送出中……";
     try{
@@ -419,6 +433,75 @@ function renderSummary(){
       st.className="status ok"; st.textContent="已送出。若主持人端沒有看到您的資料，請改按「下載結果檔」，把檔案傳給主持人。";
     }catch(err){ st.className="status err"; st.textContent="送出失敗（可能是網路問題）。請按「下載結果檔」，把檔案傳給主持人。"; }
   };
+}
+
+function chipsMini(ids){ return (ids||[]).map(id=>{const c=catById(id); return `<span class="chip on" style="background:${c.col};border-color:${c.col};font-size:12.5px;padding:0 7px">${c.id}${esc(c.short)}</span>`}).join(" ") || `<span class="mini">（未標記）</span>`; }
+function reviewTable(ex){
+  return `<table style="margin-top:6px"><tr><th>#</th><th>角色</th><th class="l">臺詞</th><th class="l">我的類別</th><th>⭐</th><th>🔒</th></tr>
+  ${EX[ex].lines.filter(l=>!l.ctx).map(l=>{const t=(S.tags[ex]||{})[l.n]||{};
+    return `<tr><td>${l.n}</td><td><span class="sp ${l.sp}">${l.sp}</span></td><td class="l" style="max-width:420px">${esc(l.t.length>34?l.t.slice(0,34)+"……":l.t)}</td>
+    <td class="l">${chipsMini(t.c)}</td><td>${t.s?"⭐":""}</td><td>${t.l?"🔒":""}</td></tr>`}).join("")}</table>`;
+}
+
+let CMP = {agg:null, msg:"", ex:"A"};
+async function loadAgg(){
+  const api=apiUrl();
+  if(!api){ CMP.msg="nofile"; return; }
+  CMP.msg="loading"; renderCompare();
+  try{ const r=await fetch(api+(api.includes("?")?"&":"?")+"mode=agg&t="+Date.now()); const j=await r.json();
+    if(!j.open){ CMP.agg=null; CMP.msg="closed"; } else { CMP.agg=j; CMP.msg=""; } }
+  catch(e){ CMP.msg="error"; }
+  renderCompare();
+}
+function renderCompare(){
+  const head=`<div class="card" style="max-width:1100px;margin:0 auto 14px"><h2 style="margin-top:0">與大家比較</h2>
+   <p class="mini">您的標記存在這台電腦的瀏覽器中；全體結果只包含各類別的勾選比例，看不到其他老師的姓名與個別標記。</p>
+   <div class="field" style="margin:8px 0">${apiUrl()?`<button class="btn small" id="reload">讀取最新全體結果</button>`:""}
+   <label class="btn small ghost" style="display:inline-flex;align-items:center">載入主持人提供的彙整檔<input type="file" id="aggf" accept=".json,application/json" class="hidden"></label></div>
+   ${CMP.msg==="loading"?`<p class="status">讀取中……</p>`:""}
+   ${CMP.msg==="closed"?`<p class="status err">主持人尚未開放比較。請先等待全場討論，開放後再按「讀取最新全體結果」。</p>`:""}
+   ${CMP.msg==="error"?`<p class="status err">讀取失敗，請稍後再試，或向主持人索取彙整檔。</p>`:""}
+   ${!apiUrl()&&!CMP.agg?`<p class="status">本頁未連接試算表，請載入主持人提供的彙整檔。</p>`:""}</div>`;
+  if(!CMP.agg){ $("#app").innerHTML=head; bindCmp(); return; }
+  const A=CMP.agg.agg; let tot=0, sameMaj=0, sameAI=0;
+  ORDER.forEach(ex=>EX[ex].lines.forEach(l=>{ if(l.ctx) return; const t=(S.tags[ex]||{})[l.n]; if(!t||!t.c||!t.c.length) return;
+    const g=(A[ex]||{})[l.n]; if(!g||!g.N) return; tot++;
+    const maj=CATS.filter(c=>(g.pc[c.id]||0)/g.N>=0.5).map(c=>c.id);
+    if(jacc(t.c,maj)>=0.5) sameMaj++; if(jacc(t.c,l.ai)>=0.5) sameAI++; }));
+  const ex=CMP.ex, e=EX[ex];
+  const rows=e.lines.map(l=>{
+    if(l.ctx) return `<tr><td colspan="6" class="t mini">${esc(l.ctx)}</td></tr>`;
+    const t=(S.tags[ex]||{})[l.n]||{c:[]}; const g=(A[ex]||{})[l.n]||{N:0,pc:{},s:0,l:0};
+    const maj=CATS.filter(c=>g.N&&(g.pc[c.id]||0)/g.N>=0.5).map(c=>c.id);
+    const diff = t.c&&t.c.length&&g.N&&jacc(t.c,maj)<0.5;
+    const minor = CATS.filter(c=>g.pc[c.id] && g.pc[c.id]/g.N<0.2).length;
+    const grp = CATS.filter(c=>g.pc[c.id] && g.pc[c.id]/g.N>=0.2).sort((a,b)=>g.pc[b.id]-g.pc[a.id]).map(c=>{const p=Math.round(g.pc[c.id]/g.N*100);
+      return `<div style="display:flex;align-items:center;gap:6px;font-size:12.5px"><span style="width:56px">${c.id}${esc(c.short)}</span><span style="flex:1;height:10px;background:#ece9e0;border-radius:3px;overflow:hidden"><span style="display:block;height:100%;width:${p}%;background:${c.col}"></span></span><span style="width:34px;text-align:right">${p}%</span></div>`}).join("");
+    return `<tr class="${diff?"dis":""}"><td>${l.n}</td><td><span class="sp ${l.sp}">${l.sp}</span></td>
+      <td class="t">${esc(l.t)}${diff?`<span class="reasons" style="color:var(--warn)">您的判斷與多數老師不同</span>`:""}</td>
+      <td class="l">${chipsMini(t.c)}${t.s?" ⭐":""}${t.l?" 🔒":""}</td>
+      <td class="l" style="min-width:190px">${grp||"<span class='mini'>—</span>"}${minor?`<div class="mini">另有 ${minor} 類各低於20%</div>`:""}<div class="mini">⭐ ${g.s||0}　🔒 ${g.l||0}　（${g.N} 人）</div></td>
+      <td class="l" style="min-width:170px">${chipsMini(l.ai)}${l.aiS?" ⭐":""}${l.aiL?" 🔒":""}<div class="mini">${esc(l.why)}</div></td></tr>`;
+  }).join("");
+  $("#app").innerHTML = head + `<div class="card" style="max-width:1100px;margin:0 auto">
+    <p><span class="pill">全體 ${CMP.agg.n} 位</span>　<span class="pill">與多數老師相近：${sameMaj}/${tot} 句</span>　<span class="pill">與 AI 相近：${sameAI}/${tot} 句</span></p>
+    <p class="mini">「相近」＝您勾選的類別與對方的重疊程度達一半以上。「多數老師」＝半數以上老師勾選的類別。底色標示您與多數不同的句子。</p>
+    <div class="tabs" style="margin:10px 0">${ORDER.map(k=>`<button class="tab${k===ex?" on":""}" data-ex="${k}">${esc(LABEL[k])}</button>`).join("")}</div>
+    <h3 style="margin:6px 0">${esc(LABEL[ex])}｜${esc(e.title)}</h3>
+    <div style="overflow-x:auto"><table class="heat"><tr><th>#</th><th>角色</th><th class="l">臺詞</th><th class="l">我的標記</th><th class="l">全體老師</th><th class="l">AI</th></tr>${rows}</table></div></div>`;
+  document.querySelectorAll("[data-ex]").forEach(b=>b.onclick=()=>{CMP.ex=b.dataset.ex;renderCompare();});
+  bindCmp();
+}
+function bindCmp(){
+  if($("#reload")) $("#reload").onclick=loadAgg;
+  $("#aggf").onchange=ev=>{const f=ev.target.files[0]; if(!f) return; const r=new FileReader();
+    r.onload=()=>{try{const j=JSON.parse(r.result); if(j.kind!=="wk-agg") throw 0; CMP.agg=j; CMP.msg=""; renderCompare();}catch(e){alert("這不是彙整檔");}}; r.readAsText(f);};
+}
+function buildAgg(list){
+  const agg={}; ORDER.forEach(ex=>{agg[ex]={}; EX[ex].lines.forEach(l=>{ if(l.ctx) return; const g={N:0,pc:{},s:0,l:0};
+    list.forEach(p=>{const t=tagOf(p,ex,l.n); if(!t) return; if(t.c&&t.c.length){g.N++; t.c.forEach(c=>g.pc[c]=(g.pc[c]||0)+1);} if(t.s) g.s++; if(t.l) g.l++;});
+    agg[ex][l.n]=g; }); });
+  return {kind:"wk-agg", version:VERSION, open:true, n:list.length, agg};
 }
 
 /* ============ 主持人模式 ============ */
@@ -457,6 +540,9 @@ function renderHost(){
      <button class="btn small" id="fetch">從試算表讀取</button>
      <label class="btn small ghost" style="display:inline-flex;align-items:center">匯入結果檔<input type="file" id="files" accept=".json,application/json" multiple class="hidden"></label>
      <button class="btn small ${H.showAI?"":"ghost"}" id="ai">${H.showAI?"隱藏 AI 標記":"揭曉 AI 標記"}</button>
+     <button class="btn small ghost" id="open">開放老師比較</button>
+     <button class="btn small ghost" id="close">關閉比較</button>
+     <button class="btn small ghost" id="aggdl" title="無法連線試算表時，下載後傳給老師">下載彙整檔</button>
      <button class="btn small ghost" id="big">${H.big?"一般字級":"放大字級"}</button>
      <button class="btn small ghost" id="demo" title="產生模擬資料，供會前演練">模擬資料</button>
      <button class="btn small ghost" id="clear">清除</button>
@@ -470,6 +556,8 @@ function renderHost(){
   $("#ai").onclick=()=>{H.showAI=!H.showAI;renderHost()};
   $("#big").onclick=()=>{H.big=!H.big;renderHost()};
   $("#demo").onclick=()=>{addSubs(makeDemo(8));renderHost()};
+  $("#open").onclick=()=>setOpen(true); $("#close").onclick=()=>setOpen(false);
+  $("#aggdl").onclick=()=>{ if(!subsArr().length){$("#hstatus").textContent="尚無資料";return;} download("全體彙整.json", buildAgg(subsArr())); };
   $("#clear").onclick=()=>{if(confirmClear()){H.subs={};renderHost()}};
   const d=$("#drop");
   d.ondragover=e=>{e.preventDefault();d.classList.add("over")}; d.ondragleave=()=>d.classList.remove("over");
@@ -477,13 +565,21 @@ function renderHost(){
   if(!N){ $("#hview").innerHTML=`<div class="card"><p>尚無資料。請按「從試算表讀取」，或匯入老師們傳來的結果檔。</p><p class="mini">會前演練可按「模擬資料」產生8位虛擬標記者（依 AI 標記加入隨機差異），正式使用前再按「清除」。</p></div>`; return; }
   H.ex==="ALL" ? renderOverview() : renderHeat(H.ex);
 }
+async function setOpen(v){
+  const url=$("#api").value.trim(); const st=$("#hstatus");
+  if(!url){st.textContent="未設定試算表網址；可改用「下載彙整檔」傳給老師";return}
+  try{ await fetch(url,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({kind:"wk-config",key:HOST_KEY,open:v})});
+    const r=await fetch(url+(url.includes("?")?"&":"?")+"mode=agg&t="+Date.now()); const j=await r.json();
+    st.textContent = j.open? "已開放：老師可按「讀取最新全體結果」" : "已關閉比較"; }
+  catch(e){ st.textContent="設定失敗，請稍後再試"; }
+}
 let clearArmed=0;
 function confirmClear(){ const now=Date.now(); if(now-clearArmed<3000){clearArmed=0;return true;} clearArmed=now; $("#hstatus").textContent="再按一次「清除」以確認"; return false; }
 async function fetchApi(){
   const url=$("#api").value.trim(); store.set("wk_api",url); const st=$("#hstatus");
   if(!url){st.textContent="請先貼上 Apps Script 網址";return}
   st.textContent="讀取中……";
-  try{ const r=await fetch(url+(url.includes("?")?"&":"?")+"t="+Date.now()); const j=await r.json(); addSubs(j.submissions||j); renderHost(); $("#hstatus").textContent="已更新 "+new Date().toLocaleTimeString("zh-TW"); }
+  try{ const r=await fetch(url+(url.includes("?")?"&":"?")+"key="+encodeURIComponent(HOST_KEY)+"&t="+Date.now()); const j=await r.json(); addSubs(j.submissions||j); renderHost(); $("#hstatus").textContent="已更新 "+new Date().toLocaleTimeString("zh-TW"); }
   catch(e){ st.textContent="讀取失敗。可在新分頁開啟該網址，將內容另存為 .json 後匯入。"; }
 }
 function readFiles(fl){
@@ -559,14 +655,15 @@ function makeDemo(k){
 }
 
 /* ============ 路由 ============ */
-const isHost = params.has("host");
-$("#modeLink").textContent = isHost? "返回標記模式" : "主持人模式";
-$("#modeLink").onclick = e=>{e.preventDefault(); const u=new URL(location.href); isHost?u.searchParams.delete("host"):u.searchParams.set("host","1"); location.href=u.toString();};
+const isHost = params.get("host") === HOST_KEY;
+if(isHost){ $("#modeLink").classList.remove("hidden");
+  $("#modeLink").onclick = e=>{e.preventDefault(); const u=new URL(location.href); u.searchParams.delete("host"); location.href=u.toString();}; }
 function render(){
   if(isHost) return renderHost();
   renderHeader();
   if(S.view==="intro"||!S.name) {S.view="intro"; renderHeader(); return renderIntro();}
   if(S.view==="summary") return renderSummary();
+  if(S.view==="compare"){ renderCompare(); if(!CMP.agg && apiUrl()) loadAgg(); return; }
   renderExcerpt(S.view);
 }
 render();
