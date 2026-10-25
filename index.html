@@ -263,7 +263,13 @@ $("#ver").textContent = VERSION;
 
 /* ============ 參與者模式 ============ */
 const SKEY = "wk_state_"+VERSION;
-let S = store.get(SKEY) || {id: "p"+Math.random().toString(36).slice(2,10), name:"", tags:{}, view:"intro", submittedAt:null};
+const CODE_CH = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+function newCode(){ let c=""; const a=new Uint32Array(6); try{crypto.getRandomValues(a)}catch(e){for(let i=0;i<6;i++)a[i]=Math.random()*1e9} for(let i=0;i<6;i++) c+=CODE_CH[a[i]%CODE_CH.length]; return c; }
+function fmtCode(c){ return c? c.slice(0,3)+"-"+c.slice(3) : ""; }
+function normCode(v){ return String(v||"").toUpperCase().replace(/[^A-Z0-9]/g,""); }
+let S = store.get(SKEY) || {id:"", name:"", tags:{}, view:"intro", submittedAt:null, final:false};
+if(!/^[A-Z2-9]{6}$/.test(S.id||"")) S.id="";
+let lastSavedSig = null, saveState = "";
 let focusIdx = -1;
 function save(){store.set(SKEY,S)}
 function T(ex,n){ S.tags[ex] = S.tags[ex]||{}; S.tags[ex][n] = S.tags[ex][n]||{c:[],s:false,r:"",l:false}; return S.tags[ex][n]; }
@@ -272,6 +278,18 @@ function doneCount(ex){ let k=0; for(let i=1;i<=EX[ex].count;i++) if(isTagged(ex
 function totalDone(){ return ORDER.reduce((a,e)=>a+doneCount(e),0) }
 function totalLines(){ return ORDER.reduce((a,e)=>a+EX[e].count,0) }
 
+function sig(){ return JSON.stringify(S.tags); }
+async function autosave(){
+  const api=apiUrl(); if(!api||!S.id||!S.name) return;
+  const sg=sig(); if(sg===lastSavedSig) return;
+  try{
+    await fetch(api,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(payload())});
+    lastSavedSig=sg; saveState="已自動儲存 "+new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"});
+  }catch(e){ saveState="自動儲存失敗（標記仍保存在本機）"; }
+  const el=$("#saveState"); if(el) el.textContent=saveState;
+}
+function go(view){ autosave(); S.view=view; save(); render(); window.scrollTo(0,0); }
+
 function renderHeader(){
   $("#who").textContent = S.name ? "標記者："+S.name : "";
   const tabs = $("#tabs"); tabs.innerHTML="";
@@ -279,13 +297,13 @@ function renderHeader(){
   ORDER.forEach(e=>{
     const b=document.createElement("button"); b.className="tab"+(S.view===e?" on":"");
     b.innerHTML = esc(LABEL[e])+`<span class="done">${doneCount(e)}/${EX[e].count}</span>`;
-    b.onclick=()=>{S.view=e;save();render();window.scrollTo(0,0)}; tabs.appendChild(b);
+    b.onclick=()=>{go(e)}; tabs.appendChild(b);
   });
   const b=document.createElement("button"); b.className="tab"+(S.view==="summary"?" on":"");
-  b.textContent="完成與送出"; b.onclick=()=>{S.view="summary";save();render();window.scrollTo(0,0)}; tabs.appendChild(b);
+  b.textContent="完成與送出"; b.onclick=()=>{go("summary")}; tabs.appendChild(b);
   const c=document.createElement("button"); c.className="tab"+(S.view==="compare"?" on":"");
-  c.textContent="與大家比較"; c.onclick=()=>{S.view="compare";save();render();window.scrollTo(0,0)}; tabs.appendChild(c);
-  $("#progress").textContent = `已標記 ${totalDone()} / ${totalLines()} 句`;
+  c.textContent="與大家比較"; c.onclick=()=>{go("compare")}; tabs.appendChild(c);
+  $("#progress").innerHTML = `${S.id?`<span title="換電腦時，在開始頁輸入此取回碼即可接續" style="margin-right:12px">取回碼 <b style="color:var(--ink);letter-spacing:.08em;font-size:16px">${fmtCode(S.id)}</b></span>`:""}已標記 ${totalDone()} / ${totalLines()} 句 <span id="saveState" class="mini" style="margin-left:8px">${esc(saveState)}</span>`;
 }
 
 function legendHTML(){
@@ -307,20 +325,37 @@ function renderIntro(){
      <li>另有兩個獨立標記：<b>⭐ 亮點</b>（這一句讓你覺得角色真的在思考，請寫一句理由）與 <b>🔒 定案點</b>（答案或結論在這一句被確定）。兩者都不是每句必標。</li>
      <li>四個片段依序完成後，到「完成與送出」頁送出結果。</li>
    </ol>
-   <p class="hint">標記內容會自動保存在這台電腦的瀏覽器中，關閉頁面後再開啟仍可接續。</p>
+   <p class="hint">標記內容會自動保存在這台電腦的瀏覽器中，關閉頁面後再開啟仍可接續；每次切換片段時也會自動儲存到團隊試算表。<b>請不要使用無痕視窗</b>，無痕視窗關閉後紀錄會消失。</p>
+   <p class="hint">開始後，畫面右上角會顯示您的<b>取回碼</b>，請拍照或記下。換電腦時可用它接續進度。</p>
    <div class="field"><label for="nm"><b>您的姓名或代號</b></label>
      <input id="nm" value="${esc(S.name)}" placeholder="例如：王老師"><button class="btn" id="go">開始標記</button></div>
-   <p class="hint">換了電腦？<label style="color:var(--accent);cursor:pointer;text-decoration:underline">載入我先前下載的結果檔<input type="file" id="mine" accept=".json,application/json" class="hidden"></label>，即可接續或查看比較。</p>
+   <div class="card" style="background:#faf9f5;margin-top:14px;padding:14px">
+     <b>換了電腦？</b>
+     <div class="field" style="margin:8px 0">${apiUrl()?`<input id="code" placeholder="輸入取回碼，例如 K7Q-4MZ" style="min-width:200px;text-transform:uppercase"><button class="btn ghost" id="fetchMine">取回我的進度</button>`:""}
+       <label class="btn ghost" style="display:inline-flex;align-items:center">載入結果檔<input type="file" id="mine" accept=".json,application/json" class="hidden"></label></div>
+     <div id="mineStatus" class="status"></div>
+   </div>
   </div>`;
+  if($("#fetchMine")){ $("#fetchMine").onclick=fetchMine; $("#code").onkeydown=e=>{if(e.key==="Enter")fetchMine()}; }
   $("#mine").onchange=e=>loadMine(e.target.files[0]);
-  $("#go").onclick=()=>{const v=$("#nm").value.trim(); if(!v){$("#nm").focus();return;} S.name=v; S.view=ORDER[0]; save(); render();};
+  $("#go").onclick=()=>{const v=$("#nm").value.trim(); if(!v){$("#nm").focus();return;} S.name=v; if(!S.id) S.id=newCode(); S.view=firstUnfinished(); save(); render(); autosave();};
   $("#nm").onkeydown=e=>{if(e.key==="Enter")$("#go").click()};
 }
 
+function firstUnfinished(){ return ORDER.find(e=>doneCount(e)<EX[e].count) || "summary"; }
+function adopt(p){ S.id = /^[A-Z2-9]{6}$/.test(p.id||"")? p.id : newCode(); S.name=p.name||S.name; S.tags=p.tags||{}; S.final=p.status==="final"; S.view=firstUnfinished(); lastSavedSig=sig(); save(); render(); }
 function loadMine(f){ if(!f) return; const r=new FileReader();
-  r.onload=()=>{ try{ const p=JSON.parse(r.result); if(p.kind!=="wk-submission") throw 0;
-    S.id=p.id; S.name=p.name; S.tags=p.tags||{}; S.view="summary"; save(); render(); }catch(e){ alert("這不是標記結果檔"); } };
+  r.onload=()=>{ try{ const p=JSON.parse(r.result); if(p.kind!=="wk-submission") throw 0; adopt(p); }catch(e){ alert("這不是標記結果檔"); } };
   r.readAsText(f); }
+async function fetchMine(){
+  const code=normCode($("#code").value); const st=$("#mineStatus");
+  if(code.length!==6){ st.className="status err"; st.textContent="取回碼是6個英數字，例如 K7Q-4MZ"; return; }
+  st.className="status"; st.textContent="取回中……";
+  try{ const api=apiUrl(); const r=await fetch(api+(api.includes("?")?"&":"?")+"mode=mine&code="+code+"&t="+Date.now()); const j=await r.json();
+    if(!j.found){ st.className="status err"; st.textContent="找不到這組取回碼。請確認後再試，或請主持人協助。"; return; }
+    adopt(j.submission); saveState="已取回進度";
+  }catch(e){ st.className="status err"; st.textContent="取回失敗，請檢查網路後再試，或請主持人協助。"; }
+}
 
 function lineCardHTML(ex,l){
   if(l.ctx) return `<div class="ctxline">${esc(l.ctx)}</div>`;
@@ -344,8 +379,8 @@ function renderExcerpt(ex){
     <div class="nav">${idx>0?`<button class="btn ghost" id="prev">← ${esc(LABEL[ORDER[idx-1]])}</button>`:"<span></span>"}
       ${idx<ORDER.length-1?`<button class="btn" id="next">${esc(LABEL[ORDER[idx+1]])} →</button>`:`<button class="btn" id="next">完成與送出 →</button>`}</div>
   </section>${legendHTML()}</div>`;
-  if($("#prev")) $("#prev").onclick=()=>{S.view=ORDER[idx-1];save();render();window.scrollTo(0,0)};
-  $("#next").onclick=()=>{S.view= idx<ORDER.length-1?ORDER[idx+1]:"summary";save();render();window.scrollTo(0,0)};
+  if($("#prev")) $("#prev").onclick=()=>{go(ORDER[idx-1])};
+  $("#next").onclick=()=>{go(idx<ORDER.length-1?ORDER[idx+1]:"summary")};
   bindLines(ex);
 }
 
@@ -403,7 +438,7 @@ function payload(){
   const flat=[];
   ORDER.forEach(ex=>EX[ex].lines.forEach(l=>{ if(l.ctx) return; const t=(S.tags[ex]||{})[l.n];
     flat.push({ex, label:LABEL[ex], n:l.n, sp:l.sp, c:(t&&t.c)||[], s:!!(t&&t.s), r:(t&&t.r)||"", l:!!(t&&t.l)}); }));
-  return {kind:"wk-submission", version:VERSION, id:S.id, name:S.name, ts:new Date().toISOString(), tags:S.tags, flat};
+  return {kind:"wk-submission", version:VERSION, id:S.id, name:S.name, ts:new Date().toISOString(), status:S.final?"final":"draft", done:totalDone(), total:totalLines(), tags:S.tags, flat};
 }
 
 function renderSummary(){
@@ -416,20 +451,22 @@ function renderSummary(){
    ${ORDER.map(e=>`<div class="sum-block"><h3>${esc(LABEL[e])}｜${esc(EX[e].title)}</h3>${matrixTable(speakerMatrix(e,l=>(S.tags[e]||{})[l.n]))}
      <details style="margin-top:8px"><summary class="mini" style="cursor:pointer">逐句回顧</summary>${reviewTable(e)}</details></div>`).join("")}
    <div class="field">
-     ${api?`<button class="btn" id="send">送出到團隊試算表</button>`:""}
+     ${api?`<button class="btn" id="send">${S.final?"重新送出":"標記完成，送出"}</button>`:""}
      <button class="btn ghost" id="dl">下載結果檔</button>
      <button class="btn ghost" id="cmp">與大家比較 →</button>
    </div>
+   <p class="mini">您的取回碼：<b style="font-size:16px;color:var(--ink)">${fmtCode(S.id)}</b>。換電腦時，在開始頁輸入即可接續。</p>
    <div id="sendStatus" class="status">${S.submittedAt?`上次送出時間：${new Date(S.submittedAt).toLocaleString("zh-TW")}（可修改後重新送出，系統會保留最新一次）`:""}</div>
    ${api?"":`<p class="hint">本頁尚未設定試算表網址，請按「下載結果檔」後，把檔案傳給主持人。</p>`}
   </div>`;
-  $("#dl").onclick=()=>download(`標記_${S.name||"未命名"}.json`, payload());
-  $("#cmp").onclick=()=>{S.view="compare";save();render();window.scrollTo(0,0)};
+  $("#dl").onclick=()=>download(`result_${S.id||"local"}.json`, payload());
+  $("#cmp").onclick=()=>{go("compare")};
   if($("#send")) $("#send").onclick=async()=>{
     const st=$("#sendStatus"); st.className="status"; st.textContent="送出中……";
     try{
+      S.final=true;
       await fetch(api,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(payload())});
-      S.submittedAt=new Date().toISOString(); save();
+      S.submittedAt=new Date().toISOString(); lastSavedSig=sig(); save(); $("#send").textContent="重新送出";
       st.className="status ok"; st.textContent="已送出。若主持人端沒有看到您的資料，請改按「下載結果檔」，把檔案傳給主持人。";
     }catch(err){ st.className="status err"; st.textContent="送出失敗（可能是網路問題）。請按「下載結果檔」，把檔案傳給主持人。"; }
   };
@@ -505,10 +542,28 @@ function buildAgg(list){
 }
 
 /* ============ 主持人模式 ============ */
-let H = {subs:{}, ex:"A", showAI:false, big:false};
-function addSubs(list){
+let H = {subs:{}, src:{}, ex:"A", showAI:false, big:false, pick:""};
+function addSubs(list, src){
   (Array.isArray(list)?list:[list]).forEach(p=>{ if(!p||p.kind!=="wk-submission"||!p.id) return;
-    const prev=H.subs[p.id]; if(!prev || prev.ts < p.ts) H.subs[p.id]=p; });
+    const prev=H.subs[p.id]; if(!prev || prev.ts < p.ts || (src==="sheet" && prev.ts===p.ts)){ H.subs[p.id]=p; H.src[p.id]=src||"file"; } });
+}
+function doneOf(p){ let k=0; ORDER.forEach(ex=>Object.values((p.tags||{})[ex]||{}).forEach(t=>{if(t&&t.c&&t.c.length)k++;})); return k; }
+function flatOf(p){ const flat=[]; ORDER.forEach(ex=>EX[ex].lines.forEach(l=>{ if(l.ctx) return; const t=tagOf(p,ex,l.n);
+  flat.push({ex,label:LABEL[ex],n:l.n,sp:l.sp,c:(t&&t.c)||[],s:!!(t&&t.s),r:(t&&t.r)||"",l:!!(t&&t.l)}); })); return flat; }
+function rosterHTML(){
+  const ps=subsArr().slice().sort((a,b)=>String(a.name).localeCompare(String(b.name),"zh-Hant"));
+  const byName={}; ps.forEach(p=>{const k=String(p.name||"").trim(); (byName[k]=byName[k]||[]).push(p);});
+  const dup=Object.entries(byName).filter(([k,v])=>v.length>1);
+  const srcLab={sheet:"試算表",file:"匯入檔案",demo:"模擬"};
+  return `<details class="card" style="margin-bottom:14px" ${H.rosterOpen?"open":""} id="roster"><summary style="cursor:pointer"><b>老師進度</b>　<span class="mini">完成 ${ps.filter(p=>p.status==="final").length}／共 ${ps.length} 位${dup.length?`　<span style="color:var(--warn);font-weight:700">⚠ 有同名資料</span>`:""}</span></summary>
+   ${dup.length?`<p class="status err">同名但取回碼不同：${dup.map(([k,v])=>`「${esc(k)}」${v.length} 筆（${v.map(p=>fmtCode(p.id)||p.id).join("、")}）`).join("；")}。可能是老師換電腦後重新開始，請確認後到試算表刪除不要的那一筆。</p>`:""}
+   <table style="margin-top:8px"><tr><th class="l">姓名</th><th>取回碼</th><th>進度</th><th>狀態</th><th>最後更新</th><th>來源</th></tr>
+   ${ps.map(p=>`<tr><td class="l">${esc(p.name)}</td><td><b>${esc(fmtCode(p.id)||p.id)}</b></td><td>${doneOf(p)}/${totalLines()}</td><td>${p.status==="final"?"✅ 已完成":"進行中"}</td><td class="mini">${p.ts?new Date(p.ts).toLocaleTimeString("zh-TW"):""}</td><td class="mini">${srcLab[H.src[p.id]]||""}</td></tr>`).join("")}</table>
+   <div class="field" style="margin:10px 0 0">
+     <select id="pick" style="padding:6px 10px;border:1px solid var(--line);border-radius:8px"><option value="">選擇一位老師……</option>${ps.map(p=>`<option value="${esc(p.id)}" ${H.pick===p.id?"selected":""}>${esc(p.name)}（${esc(fmtCode(p.id)||p.id)}，${doneOf(p)}/${totalLines()}）</option>`).join("")}</select>
+     <button class="btn small ghost" id="pickdl">下載他的結果檔</button>
+     <span class="mini">老師換電腦時：告訴他取回碼即可；若取回失敗，再下載結果檔傳給他載入。</span>
+   </div></details>`;
 }
 function subsArr(){return Object.values(H.subs)}
 function tagOf(p,ex,n){ return (p.tags&&p.tags[ex]&&p.tags[ex][n]) || null; }
@@ -543,22 +598,29 @@ function renderHost(){
      <button class="btn small ghost" id="open">開放老師比較</button>
      <button class="btn small ghost" id="close">關閉比較</button>
      <button class="btn small ghost" id="aggdl" title="無法連線試算表時，下載後傳給老師">下載彙整檔</button>
+     <button class="btn small ghost" id="push" title="把用檔案匯入的老師資料寫進試算表（會檢查重複）">將匯入的檔案寫入試算表</button>
      <button class="btn small ghost" id="big">${H.big?"一般字級":"放大字級"}</button>
      <button class="btn small ghost" id="demo" title="產生模擬資料，供會前演練">模擬資料</button>
      <button class="btn small ghost" id="clear">清除</button>
      <span id="hstatus" class="mini"></span>
    </div>
    <div class="drop" id="drop">也可以把老師們的結果檔（.json）直接拖曳到這裡</div>
-   <div id="hview" style="margin-top:16px"></div>`;
+   <div style="margin-top:14px">${N?rosterHTML():""}</div>
+   <div id="hview" style="margin-top:2px"></div>`;
+  if($("#roster")) $("#roster").ontoggle=()=>{H.rosterOpen=$("#roster").open};
+  if($("#pick")) $("#pick").onchange=()=>{H.pick=$("#pick").value};
+  if($("#pickdl")) $("#pickdl").onclick=()=>{ const p=H.subs[$("#pick").value]; if(!p){$("#hstatus").textContent="請先選擇一位老師";return;}
+    download(`result_${p.id}.json`, Object.assign({},p,{flat:flatOf(p)})); };
+  $("#push").onclick=pushImported;
   $("#fetch").onclick=fetchApi;
   $("#api").onchange=()=>store.set("wk_api",$("#api").value.trim());
   $("#files").onchange=e=>readFiles(e.target.files);
   $("#ai").onclick=()=>{H.showAI=!H.showAI;renderHost()};
   $("#big").onclick=()=>{H.big=!H.big;renderHost()};
-  $("#demo").onclick=()=>{addSubs(makeDemo(8));renderHost()};
+  $("#demo").onclick=()=>{addSubs(makeDemo(8),"demo");renderHost()};
   $("#open").onclick=()=>setOpen(true); $("#close").onclick=()=>setOpen(false);
-  $("#aggdl").onclick=()=>{ if(!subsArr().length){$("#hstatus").textContent="尚無資料";return;} download("全體彙整.json", buildAgg(subsArr())); };
-  $("#clear").onclick=()=>{if(confirmClear()){H.subs={};renderHost()}};
+  $("#aggdl").onclick=()=>{ if(!subsArr().length){$("#hstatus").textContent="尚無資料";return;} download("summary_all.json", buildAgg(subsArr())); };
+  $("#clear").onclick=()=>{if(confirmClear()){H.subs={};H.src={};renderHost()}};
   const d=$("#drop");
   d.ondragover=e=>{e.preventDefault();d.classList.add("over")}; d.ondragleave=()=>d.classList.remove("over");
   d.ondrop=e=>{e.preventDefault();d.classList.remove("over");readFiles(e.dataTransfer.files)};
@@ -573,17 +635,38 @@ async function setOpen(v){
     st.textContent = j.open? "已開放：老師可按「讀取最新全體結果」" : "已關閉比較"; }
   catch(e){ st.textContent="設定失敗，請稍後再試"; }
 }
+async function pushImported(){
+  const url=$("#api").value.trim(); const st=$("#hstatus");
+  if(!url){st.textContent="請先貼上 Apps Script 網址";return}
+  const files=subsArr().filter(p=>H.src[p.id]==="file");
+  if(!files.length){st.textContent="目前沒有尚未寫入試算表的匯入資料（模擬資料不會寫入）";return}
+  st.textContent="比對試算表中……";
+  let sheet={};
+  try{ const r=await fetch(url+(url.includes("?")?"&":"?")+"key="+encodeURIComponent(HOST_KEY)+"&t="+Date.now()); const j=await r.json();
+    (j.submissions||[]).forEach(p=>sheet[p.id]=p); }
+  catch(e){ st.textContent="無法讀取試算表，請稍後再試"; return; }
+  let w=0,k=0;
+  for(const p of files){
+    const cur=sheet[p.id];
+    if(cur && cur.ts>=p.ts){ k++; continue; }
+    const body=Object.assign({},p,{status:p.status||"draft",done:doneOf(p),total:totalLines(),flat:flatOf(p)});
+    try{ await fetch(url,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(body)}); w++; }catch(e){}
+  }
+  const msg=`寫入 ${w} 筆，略過 ${k} 筆（試算表已有相同或較新的資料）`;
+  st.textContent=msg+"。重新讀取中……";
+  setTimeout(async()=>{ await fetchApi(); $("#hstatus").textContent=msg+"，已重新讀取。"; },2000);
+}
 let clearArmed=0;
 function confirmClear(){ const now=Date.now(); if(now-clearArmed<3000){clearArmed=0;return true;} clearArmed=now; $("#hstatus").textContent="再按一次「清除」以確認"; return false; }
 async function fetchApi(){
   const url=$("#api").value.trim(); store.set("wk_api",url); const st=$("#hstatus");
   if(!url){st.textContent="請先貼上 Apps Script 網址";return}
   st.textContent="讀取中……";
-  try{ const r=await fetch(url+(url.includes("?")?"&":"?")+"key="+encodeURIComponent(HOST_KEY)+"&t="+Date.now()); const j=await r.json(); addSubs(j.submissions||j); renderHost(); $("#hstatus").textContent="已更新 "+new Date().toLocaleTimeString("zh-TW"); }
+  try{ const r=await fetch(url+(url.includes("?")?"&":"?")+"key="+encodeURIComponent(HOST_KEY)+"&t="+Date.now()); const j=await r.json(); addSubs(j.submissions||j,"sheet"); renderHost(); $("#hstatus").textContent="已更新 "+new Date().toLocaleTimeString("zh-TW"); }
   catch(e){ st.textContent="讀取失敗。可在新分頁開啟該網址，將內容另存為 .json 後匯入。"; }
 }
 function readFiles(fl){
-  [...fl].forEach(f=>{const r=new FileReader(); r.onload=()=>{try{addSubs(JSON.parse(r.result)); renderHost();}catch(e){$("#hstatus").textContent=f.name+" 無法讀取";}}; r.readAsText(f);});
+  [...fl].forEach(f=>{const r=new FileReader(); r.onload=()=>{try{addSubs(JSON.parse(r.result),"file"); renderHost();}catch(e){$("#hstatus").textContent=f.name+" 無法讀取";}}; r.readAsText(f);});
 }
 
 function renderHeat(ex){
