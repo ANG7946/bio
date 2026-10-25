@@ -268,7 +268,7 @@ function newCode(){ let c=""; const a=new Uint32Array(6); try{crypto.getRandomVa
 function fmtCode(c){ return c? c.slice(0,3)+"-"+c.slice(3) : ""; }
 function normCode(v){ return String(v||"").toUpperCase().replace(/[^A-Z0-9]/g,""); }
 let S = store.get(SKEY) || {id:"", name:"", tags:{}, view:"intro", submittedAt:null, final:false};
-if(!/^[A-Z2-9]{6}$/.test(S.id||"")) S.id="";
+if(!/^[A-Z2-9]{6}$/.test(S.id||"")) S.id = S.name ? newCode() : "";  // 舊版資料補發取回碼
 let lastSavedSig = null, saveState = "";
 let focusIdx = -1;
 function save(){store.set(SKEY,S)}
