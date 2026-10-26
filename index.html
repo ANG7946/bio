@@ -133,9 +133,8 @@ footer a{color:var(--muted)}
 /* ============ 設定 ============ */
 // 部署 Apps Script 後，將網址貼在下方引號內（或以 ?api=網址 開啟本頁）
 const DEFAULT_API = "https://script.google.com/macros/s/AKfycbzL0lCEqONDjQ82FzlaGjYvrYo4NznN9omdqPFQvooM3Su-t1eHZLzgmmvy3OkLwCE92A/exec";
-const VERSION = "2026-10-v1";
-// 主持人模式通關碼：以 ?host=通關碼 開啟本頁才會進入主持人模式（請自行修改）
-const HOST_KEY = "maple1024";
+const VERSION = "2026-10-meeting";
+// 主持人模式：以 ?host=1 開啟本頁。通關碼不寫在本檔中，由主持人在頁面上輸入，並由 Apps Script 驗證。
 
 /* ============ 類別 ============ */
 const CATS = [
@@ -558,7 +557,7 @@ function buildAgg(list){
 }
 
 /* ============ 主持人模式 ============ */
-let H = {subs:{}, src:{}, ex:"A", showAI:false, big:false, pick:""};
+let H = {subs:{}, src:{}, ex:"A", showAI:false, big:false, pick:"", key:""};
 function addSubs(list, src){
   (Array.isArray(list)?list:[list]).forEach(p=>{ if(!p||p.kind!=="wk-submission"||!p.id) return;
     const prev=H.subs[p.id]; if(!prev || prev.ts < p.ts || (src==="sheet" && prev.ts===p.ts)){ H.subs[p.id]=p; H.src[p.id]=src||"file"; } });
@@ -607,6 +606,7 @@ function renderHost(){
   const N=subsArr().length;
   $("#app").innerHTML = `<div class="hostbar">
      <span class="pill">已匯入 <b>${N}</b> 位</span>
+     <input type="password" id="hkey" placeholder="通關碼" autocomplete="off" value="${esc(hostKey())}" style="padding:6px 10px;border:1px solid var(--line);border-radius:8px;width:130px">
      <input type="text" id="api" placeholder="Apps Script 網址" value="${esc(apiUrl())}">
      <button class="btn small" id="fetch">從試算表讀取</button>
      <label class="btn small ghost" style="display:inline-flex;align-items:center">匯入結果檔<input type="file" id="files" accept=".json,application/json" multiple class="hidden"></label>
@@ -630,6 +630,8 @@ function renderHost(){
   $("#push").onclick=pushImported;
   $("#fetch").onclick=fetchApi;
   $("#api").onchange=()=>store.set("wk_api",$("#api").value.trim());
+  $("#hkey").onchange=()=>setHostKey($("#hkey").value.trim());
+  $("#hkey").onkeydown=e=>{ if(e.key==="Enter"){ setHostKey($("#hkey").value.trim()); fetchApi(); } };
   $("#files").onchange=e=>readFiles(e.target.files);
   $("#ai").onclick=()=>{H.showAI=!H.showAI;renderHost()};
   $("#big").onclick=()=>{H.big=!H.big;renderHost()};
@@ -643,11 +645,16 @@ function renderHost(){
   if(!N){ $("#hview").innerHTML=`<div class="card"><p>尚無資料。請按「從試算表讀取」，或匯入老師們傳來的結果檔。</p><p class="mini">會前演練可按「模擬資料」產生8位虛擬標記者（依 AI 標記加入隨機差異），正式使用前再按「清除」。</p></div>`; return; }
   H.ex==="ALL" ? renderOverview() : renderHeat(H.ex);
 }
+function hostKey(){ try{ return sessionStorage.getItem("wk_hostkey")||""; }catch(e){ return H.key||""; } }
+function setHostKey(v){ H.key=v; try{ sessionStorage.setItem("wk_hostkey",v); }catch(e){} }
+function needKey(st){ if(hostKey()) return false; st.textContent="請先輸入通關碼"; const k=$("#hkey"); if(k) k.focus(); return true; }
 async function setOpen(v){
   const url=$("#api").value.trim(); const st=$("#hstatus");
   if(!url){st.textContent="未設定試算表網址；可改用「下載彙整檔」傳給老師";return}
-  try{ await fetch(url,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({kind:"wk-config",key:HOST_KEY,open:v})});
+  setHostKey($("#hkey").value.trim()); if(needKey(st)) return;
+  try{ await fetch(url,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({kind:"wk-config",key:hostKey(),open:v})});
     const r=await fetch(url+(url.includes("?")?"&":"?")+"mode=agg&t="+Date.now()); const j=await r.json();
+    if(!!j.open!==v){ st.textContent="設定沒有生效，請確認通關碼是否正確"; return; }
     st.textContent = j.open? "已開放：老師可按「讀取最新全體結果」" : "已關閉比較"; }
   catch(e){ st.textContent="設定失敗，請稍後再試"; }
 }
@@ -656,9 +663,11 @@ async function pushImported(){
   if(!url){st.textContent="請先貼上 Apps Script 網址";return}
   const files=subsArr().filter(p=>H.src[p.id]==="file");
   if(!files.length){st.textContent="目前沒有尚未寫入試算表的匯入資料（模擬資料不會寫入）";return}
+  setHostKey($("#hkey").value.trim()); if(needKey(st)) return;
   st.textContent="比對試算表中……";
   let sheet={};
-  try{ const r=await fetch(url+(url.includes("?")?"&":"?")+"key="+encodeURIComponent(HOST_KEY)+"&t="+Date.now()); const j=await r.json();
+  try{ const r=await fetch(url+(url.includes("?")?"&":"?")+"key="+encodeURIComponent(hostKey())+"&t="+Date.now()); const j=await r.json();
+    if(j.error){ st.textContent="通關碼錯誤，無法比對試算表"; return; }
     (j.submissions||[]).forEach(p=>sheet[p.id]=p); }
   catch(e){ st.textContent="無法讀取試算表，請稍後再試"; return; }
   let w=0,k=0;
@@ -677,8 +686,11 @@ function confirmClear(){ const now=Date.now(); if(now-clearArmed<3000){clearArme
 async function fetchApi(){
   const url=$("#api").value.trim(); store.set("wk_api",url); const st=$("#hstatus");
   if(!url){st.textContent="請先貼上 Apps Script 網址";return}
+  const kf=$("#hkey"); if(kf) setHostKey(kf.value.trim()); if(needKey(st)) return;
   st.textContent="讀取中……";
-  try{ const r=await fetch(url+(url.includes("?")?"&":"?")+"key="+encodeURIComponent(HOST_KEY)+"&t="+Date.now()); const j=await r.json(); addSubs(j.submissions||j,"sheet"); renderHost(); $("#hstatus").textContent="已更新 "+new Date().toLocaleTimeString("zh-TW"); }
+  try{ const r=await fetch(url+(url.includes("?")?"&":"?")+"key="+encodeURIComponent(hostKey())+"&t="+Date.now()); const j=await r.json();
+    if(j.error){ st.textContent = j.error==="not_configured" ? "Apps Script 尚未設定通關碼（請在專案設定的指令碼屬性中新增 HOST_KEY）" : "通關碼錯誤"; return; }
+    addSubs(j.submissions||[],"sheet"); renderHost(); $("#hstatus").textContent="已更新 "+new Date().toLocaleTimeString("zh-TW"); }
   catch(e){ st.textContent="讀取失敗。可在新分頁開啟該網址，將內容另存為 .json 後匯入。"; }
 }
 function readFiles(fl){
@@ -755,7 +767,7 @@ function makeDemo(k){
 }
 
 /* ============ 路由 ============ */
-const isHost = params.get("host") === HOST_KEY;
+const isHost = params.has("host");
 if(isHost){ $("#modeLink").classList.remove("hidden");
   $("#modeLink").onclick = e=>{e.preventDefault(); const u=new URL(location.href); u.searchParams.delete("host"); location.href=u.toString();}; }
 function render(){
